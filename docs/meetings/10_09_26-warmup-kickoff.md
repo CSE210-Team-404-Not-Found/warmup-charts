@@ -1,6 +1,7 @@
 # 10/09/26 - Warmup Project Kickoff Meeting
 
 Format: Hybrid, in-person + Zoom
+
 Attendees: Sarah, Jason, Tony, Pengwei, Nathan, Evan, Albert
 
 ## 1. Introductions
