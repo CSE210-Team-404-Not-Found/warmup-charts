@@ -1,4 +1,7 @@
-x,y
-0,1
-2,not-a-number
-3,
+x,Trial A,Trial B
+0,1,2
+2,not-a-number,4
+invalid,3,5
+3,,6
+4,Infinity,7
+5,2

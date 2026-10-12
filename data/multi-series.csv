@@ -1,9 +1,5 @@
-series,x,y
-Trial A,0,0
-Trial B,0,1
-Trial A,2,2
-Trial B,2,4
-Trial A,5,5
-Trial B,5,7
-Trial A,10,10
-Trial B,10,9
+x,Trial A,Trial B
+0,0,1
+2,2,4
+5,5,7
+10,10,9

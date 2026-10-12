@@ -1,71 +1,116 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
-import { parseCSV } from "../src/parseCSV.js";
-import { randomData } from "../src/randomData.js";
+import { parseCSV, randomData, Series, PointSet } from "../src/index.js";
 
-test("single series preserves decimal measurements and unsorted order", () => {
-  assert.deepEqual(parseCSV("x,y\n2,-1.5\n0,2e1"), [{
-    name: "Series 1", points: [{ x: 2, y: -1.5 }, { x: 0, y: 20 }],
-  }]);
+function points(series) {
+    return Array.from(series.points.xs, (x, i) => [x, series.points.ys[i]]);
+}
+
+test("public API returns Series and PointSet, sorted with coordinate pairs intact", () => {
+    const [series] = parseCSV("x,Distance\n2,4\n0,1\n1,3");
+    assert.ok(series instanceof Series);
+    assert.ok(series.points instanceof PointSet);
+    assert.equal(series.name, "Distance");
+    assert.deepEqual(points(series), [[0, 1], [1, 3], [2, 4]]);
 });
-test("interleaved series keep first appearance and point order", () => {
-  assert.deepEqual(parseCSV('series,x,y\nB,2,3\nA,0,1\nB,1,4'), [
-    { name: "B", points: [{ x: 2, y: 3 }, { x: 1, y: 4 }] },
-    { name: "A", points: [{ x: 0, y: 1 }] },
-  ]);
+test("wide CSV groups columns, preserves header order, and supports gaps", () => {
+    const series = parseCSV("x,Trial B,Trial A\n2,4,3\n0,,1\n1,2,");
+    assert.deepEqual(series.map(s => s.name), ["Trial B", "Trial A"]);
+    assert.deepEqual(points(series[0]), [[1, 2], [2, 4]]);
+    assert.deepEqual(points(series[1]), [[0, 1], [2, 3]]);
 });
-test("BOM, CRLF, blank lines, quotes, commas and escaped quotes", () => {
-  assert.deepEqual(parseCSV('\uFEFFseries,x,y\r\n\r\n"Trial, ""A""",1,2\r\n'), [
-    { name: 'Trial, "A"', points: [{ x: 1, y: 2 }] },
-  ]);
-  assert.equal(parseCSV('series,x,y\n"two\nlines",1,2')[0].name, "two\nlines");
+test("BOM, CRLF, whitespace, blank lines and scientific notation", () => {
+    const [s] = parseCSV("\uFEFF time , value \r\n\r\n -1.5 , 2e1 \r\n");
+    assert.equal(s.name, "value");
+    assert.deepEqual(points(s), [[-1.5, 20]]);
 });
-test("empty input and header-only input produce no series", () => {
-  for (const input of ["", "  \n", "x,y\n", "series,x,y"]) {
-    assert.deepEqual(parseCSV(input), []);
-  }
+test("header only and empty columns retain named empty series", () => {
+    assert.deepEqual(points(parseCSV("x,y\n")[0]), []);
+    const series = parseCSV("x,A,B\n0,,\n");
+    assert.deepEqual(series.map(s => s.points.length), [0, 0]);
 });
-test("malformed measurements fail with row and column instead of partial output", () => {
-  for (const value of ["", "hello", "NaN", "Infinity", "1e999", "0x10"]) {
-    assert.throws(() => parseCSV(`x,y\n0,1\n2,${value}`), /row 3, column y/);
-  }
+test("bad headers fail and quoted format is unsupported", () => {
+    for (const input of ["", "  \n", "x", "0,1\n2,3", "x,A,A", "x,A,", 'x,"A"']) {
+        assert.throws(() => parseCSV(input), Error);
+    }
+    assert.throws(() => parseCSV(null), TypeError);
 });
-test("bad schema, column counts, series names and quote syntax fail", () => {
-  for (const input of ["y,x\n1,2", "x,y\n1", "x,y\n1,2,3",
-    "series,x,y\n,1,2", 'x,y\n"1,2', 'x,y\n1"2,3', 'x,y\n"1"oops,2']) {
-    assert.throws(() => parseCSV(input), Error);
-  }
-  assert.throws(() => parseCSV(null), TypeError);
+test("invalid cells skip only their series and invalid x skips the row; counts reported", () => {
+    let warning;
+    const series = parseCSV("x,A,B\n0,1,2\n1,no,3\ninvalid,4,5\n2,6,7", {
+        onWarning: value => { warning = value; },
+    });
+    assert.deepEqual(points(series[0]), [[0, 1], [2, 6]]);
+    assert.deepEqual(points(series[1]), [[0, 2], [1, 3], [2, 7]]);
+    assert.deepEqual(warning, { skippedRows: 1, skippedCells: 1 });
 });
-test("error line numbers account for multiline quoted fields", () => {
-  assert.throws(() => parseCSV('series,x,y\n"two\nlines",1,2\nA,3,no'), /row 4, column y/);
+test("missing/extra columns skip entire row and never shift values into wrong series", () => {
+    let warning;
+    const series = parseCSV("x,A,B\n0,1\n1,2,3,4\n2,4,5", {
+        onWarning: value => { warning = value; },
+    });
+    assert.deepEqual(points(series[0]), [[2, 4]]);
+    assert.deepEqual(warning, { skippedRows: 2, skippedCells: 0 });
 });
-test("sample files exercise success, empty input and failure", async () => {
-  for (const [file, count] of [["single-series", 1], ["multi-series", 2], ["empty", 0]]) {
-    const csv = await readFile(new URL(`../data/${file}.csv`, import.meta.url), "utf8");
-    assert.equal(parseCSV(csv).length, count);
-  }
-  const bad = await readFile(new URL("../data/malformed.csv", import.meta.url), "utf8");
-  assert.throws(() => parseCSV(bad), /row 3, column y/);
+test("nonfinite, hex and Float32-overflow coordinates never enter PointSet", () => {
+    for (const value of ["NaN", "Infinity", "1e999", "1e39", "0x10", '"2"']) {
+        assert.equal(parseCSV(`x,y\n0,${value}`)[0].points.length, 0);
+        assert.equal(parseCSV(`x,y\n${value},2`)[0].points.length, 0);
+    }
 });
-test("random data uses the parser contract and caller bounds", () => {
-  const data = randomData({ seriesCount: 2, pointCount: 3,
-    xMin: -2, xMax: 2, yMin: 10, yMax: 20, random: () => 0.25 });
-  assert.deepEqual(data.map(s => s.name), ["Series 1", "Series 2"]);
-  for (const series of data) {
-    assert.equal(series.points.length, 3);
-    assert.deepEqual(series.points[0], { x: -1, y: 12.5 });
-    assert.notEqual(series.points[0], series.points[1]);
-  }
-  assert.deepEqual(randomData({ seriesCount: 0 }), []);
-  assert.deepEqual(randomData({ pointCount: 0 })[0].points, []);
-  assert.equal(randomData()[0].points.length, 10);
+test("equal x coordinates retain stable order", () => {
+    assert.deepEqual(points(parseCSV("x,y\n2,9\n1,3\n1,4")[0]), [[1, 3], [1, 4], [2, 9]]);
 });
-test("invalid random options fail explicitly", () => {
-  for (const options of [{ seriesCount: -1 }, { pointCount: 1.5 },
-    { xMin: 2, xMax: 1 }, { yMax: Infinity }, { random: null },
-    { random: () => 1 }, { random: () => NaN }]) {
-    assert.throws(() => randomData(options), Error);
-  }
+test("valid CSV does not warn; warning callback validated", () => {
+    parseCSV("x,y\n0,1", { onWarning: () => assert.fail("Unexpected warning") });
+    assert.throws(() => parseCSV("x,y", { onWarning: true }), TypeError);
+});
+test("sample files follow the public contract and malformed sample counts skips", async () => {
+    for (const [file, count, lengths] of [["single-series", 1, [6]],
+        ["multi-series", 2, [4, 4]], ["empty", 1, [0]]]) {
+        const csv = await readFile(new URL(`../data/${file}.csv`, import.meta.url), "utf8");
+        const series = parseCSV(csv);
+        assert.equal(series.length, count);
+        assert.deepEqual(series.map(s => s.points.length), lengths);
+    }
+    let warning;
+    const bad = await readFile(new URL("../data/malformed.csv", import.meta.url), "utf8");
+    const series = parseCSV(bad, { onWarning: value => { warning = value; } });
+    assert.deepEqual(warning, { skippedRows: 2, skippedCells: 2 });
+    assert.deepEqual(series.map(s => s.points.length), [1, 4]);
+});
+test("random data returns Series[] with sorted paired points and requested dimensions", () => {
+    const values = [0.75, 0.25, 0.25, 0.75];
+    let index = 0;
+    const [series] = randomData({ pointCount: 2, xMin: -2, xMax: 2,
+        yMin: 10, yMax: 20, random: () => values[index++] });
+    assert.ok(series instanceof Series);
+    assert.deepEqual(points(series), [[-1, 17.5], [1, 12.5]]);
+    const data = randomData({ seriesCount: 2, pointCount: 3, random: () => 0.5 });
+    assert.deepEqual(data.map(s => s.name), ["Series 1", "Series 2"]);
+    assert.deepEqual(data.map(s => s.points.length), [3, 3]);
+    assert.notEqual(data[0].points, data[1].points);
+    assert.deepEqual(randomData({ seriesCount: 0 }), []);
+    assert.equal(randomData({ pointCount: 0 })[0].points.length, 0);
+    assert.equal(randomData()[0].points.length, 10);
+});
+test("large random data stays finite, sorted and within default bounds", () => {
+    const [series] = randomData({ pointCount: 10000 });
+    assert.equal(series.points.length, 10000);
+    let previous = -Infinity;
+    for (const [x, y] of points(series)) {
+        assert.ok(x >= previous && x >= 0 && x <= 10);
+        assert.ok(y >= 0 && y <= 10);
+        previous = x;
+    }
+});
+test("invalid random options fail explicitly and equal bounds work", () => {
+    for (const options of [{ seriesCount: -1 }, { pointCount: 1.5 },
+        { xMin: 2, xMax: 1 }, { yMax: Infinity }, { xMax: 1e39 },
+        { random: null }, { random: () => 1 }, { random: () => NaN }]) {
+        assert.throws(() => randomData(options), Error);
+    }
+    assert.deepEqual(points(randomData({ pointCount: 1,
+        xMin: 2, xMax: 2, yMin: 3, yMax: 3 })[0]), [[2, 3]]);
 });

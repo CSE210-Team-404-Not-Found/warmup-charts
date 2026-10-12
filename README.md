@@ -1,9 +1,35 @@
 # warmup-charts
-Warmup scatter-plot and line-graph project for Team 7-11.
+Warmup scatter-plot and line-graph project for Team 7-11
 
-## Backend setup and checks
+## Running locally
+The page uses ES modules, which browsers won't load from `file://`. Instead, serve the file with `python3`:
 
-Install Node.js 22.13+ (22.x) or Node.js 24+, then run:
+```sh
+cd <project-directory>
+python3 -m http.server
+```
+
+Then open http://localhost:8000.
+
+## Layout
+`src/` contains the charting library; `index.html` and `demo/` instantiate the chart and demonstrate its usage.
+
+| Path | Owner | Contents |
+|---|---|---|
+| `src/index.js` | Both | Public API: the library's single import point |
+| `src/chart.js` | Frontend | `Chart`: one chart on one canvas, with its own state, resizing, and drawing |
+| `src/series.js` | Both | `Series`, the frontend/backend data interface: a name and a `PointSet` |
+| `src/point-set.js` | Backend | `PointSet`, the x-sorted point storage inside each series |
+| `src/data.js` | Backend | `parseCSV(text)` and `randomData(options)`, both returning `Series[]` |
+| `index.html`, `style.css`, `demo/main.js` | Frontend | Demo page using the library |
+| `data/` | Backend | Sample CSVs |
+| `docs/decisions/` | Leads | Architecture Decision Records (MADR) |
+| `docs/meetings/` | Leads | Meeting notes |
+
+
+## Backend checks
+
+Use Node.js 22.13+ (22.x) or Node.js 24+:
 
 ```sh
 npm ci
@@ -11,73 +37,77 @@ npm run lint
 npm test
 ```
 
-GitHub Actions runs these checks on pushes (including `main`) and pull requests.
-The renderer and demo page are still pending in this checkout; this contribution
-provides data processing only. No framework or runtime dependency is required.
+GitHub Actions runs these checks on every push and pull request, including `main`.
+The existing frontend skeleton still contains rendering TODOs; these backend
+functions provide the data and do no drawing or UI design.
 
-## CSV and frontend handoff
+## CSV input
 
-Import the browser-native ES modules from a script with `type="module"`:
+Use the public API, matching the current skeleton and ADR-0010:
 
 ```js
-import { parseCSV } from "./src/parseCSV.js";
-import { randomData } from "./src/randomData.js";
-
-const series = parseCSV(await file.text()); // file is a selected browser File
-// After successful parsing, pass series to the team's renderer:
-// drawChart(canvas, { type: "scatter", xLabel: "Time (s)",
-//   yLabel: "Distance (m)", series });
+import { parseCSV, randomData } from "./src/index.js";
+const series = parseCSV(await file.text(), { onWarning: console.warn });
 const testSeries = randomData({ seriesCount: 2, pointCount: 20 });
+// Both return Series[], directly accepted by Chart.setSeries(series, colors).
 ```
 
-`parseCSV(text)` returns an array of `{ name, points: [{ x, y }] }`.
-The headers are case-sensitive and must be `x,y` (one series named `Series 1`)
-or `series,x,y` (named series). Repeated names group measurements into one
-series. Series appear in order of first occurrence; points retain their file
-order. There is no sorting or interpolation.
+CSV uses a wide layout: the first column is x; each remaining column is a named
+series. The first header label is ignored. Names are trimmed, nonempty and unique.
+Quoting is unsupported: every comma separates columns. For example:
 
-Coordinates accept finite decimal numbers, including scientific notation.
-Fields are trimmed. Quoted fields support commas, newlines, and escaped double
-quotes (`""`). UTF-8 BOM, LF and CRLF are accepted. Blank lines are ignored;
-a row of empty comma-separated fields is invalid. Empty input or a valid header
-without measurements returns `[]`.
+```csv
+x,Trial A,Trial B
+0,0,1
+2,2,4
+5,5,
+10,10,9
+```
 
-Invalid headers, wrong column counts, empty names, malformed quoting, missing
-coordinates, and nonnumeric/nonfinite values throw descriptive errors. Row
-numbers refer to physical file lines, with a multiline record identified by its
-starting line. Parsing never returns partial data or silently skips invalid rows.
-The frontend must catch errors and show their message, and only call the renderer
-after parsing succeeds to preserve the existing chart on failure.
+A blank y cell means no point for that series at that x. Invalid/nonfinite y
+cells are skipped; an invalid x or wrong column count skips the whole row.
+This follows the current skeleton rather than the earlier draft PRD's policy
+of rejecting entire files. Optional `onWarning` receives one summary containing
+`skippedRows` and `skippedCells` if any values were skipped. Blank lines do not
+count as skipped rows. Invalid headers throw errors.
 
-### Sample data
+Coordinates accept decimal and scientific notation. BOM, LF, CRLF, and surrounding
+whitespace are accepted. The PointSet sorts by x (stable for ties), keeping x/y
+pairs together, and stores coordinates as Float32 values; expect normal Float32
+rounding. Values that would overflow Float32 are skipped. Header-only input
+returns the named series with empty PointSets; completely empty input is an error
+because a header is required.
 
-All examples are synthetic: x represents time in seconds and y distance in meters.
-Valid sample coordinates lie in 0–10 on both axes; the frontend team must confirm
-and configure its fixed ranges. Parsing itself does not enforce axis bounds.
+### Sample files
 
-- `data/single-series.csv`: one series, including (0,0) and (10,10).
-- `data/multi-series.csv`: two interleaved trials to check grouping and legend names.
-- `data/empty.csv`: header only, for the renderer's no-data behavior.
-- `data/malformed.csv`: fails at row 3, column y; also contains a missing coordinate.
+All samples are synthetic: x is time in seconds and y is distance in meters.
+Valid points fit 0–10 on both axes; the frontend chooses its fixed axis bounds.
 
-### Random test data
+- `data/single-series.csv`: one series with six points.
+- `data/multi-series.csv`: Trial A and Trial B with four points each.
+- `data/empty.csv`: a named series with no measurements.
+- `data/malformed.csv`: two skipped rows and two invalid y cells; blank cells
+  are gaps. The valid data is retained, as required by the skeleton.
 
-`randomData()` defaults to one series of 10 points with each coordinate in [0,10).
-Options: `seriesCount`, `pointCount`, `xMin`, `xMax`, `yMin`, `yMax`, and
-`random` (a function returning a number in [0,1), for repeatable tests).
-Counts must be nonnegative safe integers; bounds must be finite and ordered.
-Equal bounds produce a constant coordinate. Random points remain in generation
-order, so line graphs may zigzag. This data is only for testing, not measurements.
+### Random data
 
-## Explaining this contribution
+`randomData()` defaults to one series with 10 points, sampled between 0 and 10.
+Options: `seriesCount`, `pointCount`, `xMin`, `xMax`, `yMin`, `yMax`, and `random`.
+The random function must return a finite number in [0,1), and can be injected for
+repeatable tests. Counts must be nonnegative safe integers; bounds must be finite,
+ordered, and representable in Float32. Equal bounds produce constant coordinates.
+Stored values may round to the upper bound because PointSet uses Float32 storage.
+Points are sorted by x and generated through PointSet.fromArrays.
 
-The CSV reader walks through text once, keeping track of quoted fields and line
-numbers. Validation rejects the entire file on the first bad row. A JavaScript
-`Map` groups points by series name while preserving insertion order. Using
-`split(",")` alone would fail on quoted names containing commas. An external CSV
-library is an alternative, but adds a dependency for this small warmup.
+## Understanding the backend contribution
 
-Random data uses a weighted average of the lower and upper bounds for each sampled
-coordinate. Both functions return fresh arrays and objects and do no drawing.
-Automated tests cover parsing, malformed input, sample files, and random bounds.
-Review the code and run the tests before contributing it under the team's AI policy.
+`src/data.js` splits each CSV row into columns, validates coordinates, accumulates
+one x/y array per series, and creates Series objects using PointSet.fromArrays.
+PointSet handles sorting, so the parser never sorts x and y independently. Random
+data generates parallel typed arrays and uses the same constructor path.
+
+Plain comma splitting follows the team's explicitly unquoted format. A CSV
+library would be appropriate if quoted fields become a requirement. Typed arrays
+use compact storage but trade away some numeric precision. Tests import the public
+API and check sorting, gaps, invalid input, sample files and random data.
+Review and understand this code before presenting it under the team's AI policy.
