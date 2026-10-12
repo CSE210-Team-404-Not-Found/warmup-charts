@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="Try a reusable scatter and line plotting library with synthetic scientific data.">
+    <link rel="icon" href="data:,">
+    <link rel="stylesheet" href="./styles.css">
+    <title>Graph Plotter · Product prototype</title>
+  </head>
+  <body>
+    <main>
+      <header>
+        <p>Product prototype · CSE210 Team 7-11</p>
+        <h1>Graph Plotter</h1>
+        <p>Compare measured points as a scatter plot or a line chart.</p>
+      </header>
+      <form id="chart-controls" aria-label="Chart controls">
+        <label for="dataset">Dataset
+          <select id="dataset" name="dataset">
+            <option id="loaded-csv-option" value="loaded-csv" disabled hidden>Loaded CSV</option>
+            <optgroup label="Example datasets">
+              <option value="motion">Motion comparison</option>
+              <option value="cooling">Cooling comparison</option>
+              <option value="ranges">Range endpoints</option>
+            </optgroup>
+            <optgroup label="Boundary examples">
+              <option value="empty">Empty dataset</option>
+              <option value="single">One measurement</option>
+              <option value="two">Two measurements</option>
+              <option value="invalid">Out-of-range example</option>
+            </optgroup>
+          </select>
+        </label>
+        <label for="chart-type">Chart type
+          <select id="chart-type" name="chart-type">
+            <option value="scatter">Scatter plot</option>
+            <option value="line">Line chart</option>
+          </select>
+        </label>
+      </form>
+      <form id="csv-controls" aria-label="CSV input">
+        <label for="csv-file">CSV file
+          <input id="csv-file" type="file" accept=".csv,text/csv" aria-describedby="csv-help">
+        </label>
+        <label for="csv-x-label">X axis label
+          <input id="csv-x-label" value="Time (s)" required>
+        </label>
+        <label for="csv-y-label">Y axis label
+          <input id="csv-y-label" value="Distance (m)" required>
+        </label>
+        <button id="load-csv" type="submit">Load CSV</button>
+      </form>
+      <p id="csv-help">Use a header of <code>x,y</code> for one series or <code>series,x,y</code> for multiple series. Coordinates must be from 0 to 5. Include units in the axis labels. Files are read in your browser.</p>
+      <p>Sample CSVs: <a href="./examples/data/motion.csv" download>Motion comparison</a> · <a href="./examples/data/calibration.csv" download>Sensor calibration</a> · <a href="./examples/data/empty.csv" download>Empty dataset</a></p>
+      <p id="error" role="alert" hidden></p>
+      <section aria-labelledby="chart-title">
+        <h2 id="chart-title">Motion comparison</h2>
+        <p id="dataset-description"></p>
+        <figure>
+          <canvas id="chart" width="960" height="500" role="img" aria-describedby="chart-caption data-note">Your browser needs Canvas support to show the chart. The measurements are also available in the table below.</canvas>
+          <figcaption id="chart-caption" role="status" aria-live="polite"></figcaption>
+        </figure>
+        <p id="data-note">Both axes use fixed ranges from 0 to 5. Measurements are read-only. Built-in examples are synthetic.</p>
+        <details>
+          <summary>View plotted measurements</summary>
+          <div class="table-scroll">
+            <table>
+              <caption id="table-caption"></caption>
+              <thead><tr><th scope="col">Series</th><th id="x-column" scope="col">X</th><th id="y-column" scope="col">Y</th></tr></thead>
+              <tbody id="measurements"></tbody>
+            </table>
+          </div>
+        </details>
+      </section>
+      <footer>
+        <p><a href="./examples/reuse.html">Try the library in a separate example</a></p>
+      </footer>
+      <noscript><p>Enable JavaScript to draw and switch charts.</p></noscript>
+    </main>
+    <script type="module" src="./demo/app.js"></script>
+  </body>
+</html>
