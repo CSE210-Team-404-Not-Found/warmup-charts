@@ -30,13 +30,26 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # TODO(backend): run the linter here, before deploying (ADR-0008).
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run lint
+      - run: npm test
+
+      # Stage only browser assets; do not deploy npm dependencies or tests.
+      - name: Stage static site
+        run: |
+          mkdir -p _site
+          cp index.html style.css _site/
+          cp -R src demo data _site/
 
       - uses: actions/configure-pages@v5
 
       - uses: actions/upload-pages-artifact@v3
         with:
-          path: "."
+          path: "_site"
 
       - id: deployment
         uses: actions/deploy-pages@v5
