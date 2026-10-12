@@ -6,7 +6,7 @@ export default [{
     ecmaVersion: "latest",
     sourceType: "module",
     globals: {
-      document: "readonly", console: "readonly", HTMLCanvasElement: "readonly",
+      URL: "readonly", document: "readonly", console: "readonly", HTMLCanvasElement: "readonly",
       ResizeObserver: "readonly", requestAnimationFrame: "readonly",
       cancelAnimationFrame: "readonly",
     },
