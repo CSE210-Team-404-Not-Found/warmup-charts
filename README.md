@@ -38,6 +38,7 @@ npm test
 ```
 
 GitHub Actions runs these checks on every push and pull request, including `main`.
+The Pages workflow also runs lint and tests before publishing browser assets.
 The existing frontend skeleton still contains rendering TODOs; these backend
 functions provide the data and do no drawing or UI design.
 
