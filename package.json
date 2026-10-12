@@ -1,0 +1,12 @@
+{
+  "name": "warmup-charts",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "lint": "eslint .",
+    "test": "node --test"
+  },
+  "devDependencies": {
+    "eslint": "^10.12.0"
+  }
+}
