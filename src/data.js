@@ -41,9 +41,6 @@ function coordinate(text) {
  * If the header is missing, there are fewer than two columns, or duplicate names
  * exist, the function must throw.
  *
- * A row with the wrong number of cells is skipped as a whole, so values never
- * shift into the wrong series.
- *
  * @param {string} text Raw CSV file contents.
  * @param {Object} [options]
  * @param {(skipped: { skippedRows: number, skippedCells: number }) => void} [options.onWarning]
