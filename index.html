@@ -3,12 +3,38 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Warmup Charts</title>
+    <title>Graph Points | team seven eleven</title>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
+    <hgroup>
+        <h1>Graph Points</h1>
+        <h2>by team seven eleven</h2>
+    </hgroup>
     <main>
-        <input type="file" id="csv-input" accept=".csv,text/csv">
+        <section id="input-data">
+            <label for="test-sets">Dataset</label>
+            <select id="test-sets" name="test-sets">
+                <option value="empty">Empty</option>
+                <option value="malformed">Malformed</option>
+                <option value="multi-series">Multi-series</option>
+                <option value="single-series">Single-series</option>
+            </select>
+            <label for="csv-input">CSV Input</label>
+            <input type="file" id="csv-input" accept=".csv,text/csv">
+        </section>
+        <section id="chart-options">
+            <label for="chart-type">Chart Type</label>
+            <select id="chart-type" name="chart-type">
+                <option value="scatter">Scatter Plot</option>
+                <option value="line">Line Graph</option>
+            </select>
+            <label for="x-axis">X axis label</label>
+            <input type="text" id="x-axis">
+            <label for="y-axis">Y axis label</label>
+            <input type="text" id="y-axis">
+        </section>
+        <h3 id="dataset-name"></h3>
         <canvas id="chart"></canvas>
     </main>
     <script type="module" src="demo/main.js"></script>

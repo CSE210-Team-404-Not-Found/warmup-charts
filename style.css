@@ -3,3 +3,44 @@
 
     Feel free to link in other new CSS files for structuring purposes!
 */
+
+:root {
+    /* theme colors */
+    --primary-bg-color: #008061;
+    --secondary-bg-color: #ffffff;
+    --tertiary-bg-color: #dbede8;
+    --primary-accent-color: #ed1b2d;
+    --secondary-accent-color: #f5821f;
+
+    background-color: var(--tertiary-bg-color);
+}
+
+/* header */
+hgroup {
+    background-color: var(--secondary-bg-color);
+    border-width: 3vmin;
+    border-color: var(--primary-bg-color);
+    border-style: solid;
+    padding: 2vmin;
+}
+
+h1 {
+    color: var(--primary-accent-color);
+}
+
+h2 {
+    color: var(--secondary-accent-color);
+}
+
+main {
+    display: grid;
+    grid-template-columns: auto auto;
+    column-gap: 2vmin;
+    margin: 3vmin;
+}
+
+section {
+    display: grid;
+    align-content: normal;
+    row-gap: 2vmin;
+}
