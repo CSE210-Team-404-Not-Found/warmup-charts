@@ -24,8 +24,9 @@ export class PointSet {
      * @param {ArrayLike<number>} ys
      */
     static fromArrays(xs, ys) {
-        if (xs.length !== ys.length)
+        if (xs.length !== ys.length) {
             throw new RangeError("xs and ys must have the same length");
+        }
 
         const set = new PointSet(xs.length);
         set.#xs.set(xs);
@@ -65,19 +66,23 @@ export class PointSet {
      */
     push(x, y) {
         const i = this.length;
-        if (i === this.#xs.length)
+        if (i === this.#xs.length) {
             throw new RangeError(`PointSet is full (capacity ${i})`);
+        }
 
         this.#xs[i] = x;
         this.#ys[i] = y;
-        if (i > 0 && this.#xs[i] < this.#xs[i - 1])
+        if (i > 0 && this.#xs[i] < this.#xs[i - 1]) {
             this.#sorted = false;
+        }
         this.length++;
     }
 
     /** Sort points by x. Stable, and a no-op if already sorted. */
     sort() {
-        if (this.#sorted) return;
+        if (this.#sorted) {
+            return;
+        }
 
         const n = this.length;
         const xs = this.#xs;
@@ -85,7 +90,9 @@ export class PointSet {
 
         // Argsort: sort indices by x, then permute both columns once.
         const order = new Uint32Array(n);
-        for (let i = 0; i < n; i++) order[i] = i;
+        for (let i = 0; i < n; i++) {
+            order[i] = i;
+        }
         order.sort((a, b) => xs[a] - xs[b]);
 
         const nextXs = new Float32Array(xs.length);
