@@ -13,17 +13,21 @@ const input = document.getElementById("csv-input");
 const chartType = document.getElementById("chart-type");
 const xLabel = document.getElementById("x-axis");
 const yLabel = document.getElementById("y-axis");
+const chartWidth = document.getElementById("chart-width");
+const chartHeight = document.getElementById("chart-height");
 const datasetName = document.getElementById("dataset-name");
 const message = document.getElementById("message");
 
 const chart = new Chart(document.getElementById("chart"), {
+    width: chartWidth.valueAsNumber,
+    height: chartHeight.valueAsNumber,
     showLine: chartType.value === "line",
     xLabel: xLabel.value,
     yLabel: yLabel.value,
 });
 
-// Okabe-Ito palette (colorblind-safe).
-const COLORS = ["#0072b2", "#d55e00", "#009e73", "#cc79a7", "#e69f00", "#56b4e9"];
+// From the prototype; the first four are Okabe-Ito (colorblind-safe).
+const COLORS = ["#0072b2", "#d55e00", "#009e73", "#cc79a7", "#8c564b", "#6a51a3"];
 
 /** Pick a color for each series. */
 function colorsFor(series) {
@@ -104,5 +108,27 @@ chartType.addEventListener("change", () => {
 for (const control of [xLabel, yLabel]) {
     control.addEventListener("input", () => {
         chart.setOptions({ xLabel: xLabel.value, yLabel: yLabel.value });
+    });
+}
+
+const toggles = {
+    showAxes: document.getElementById("show-axes"),
+    showAxisLabels: document.getElementById("show-axis-labels"),
+    showLegend: document.getElementById("show-legend"),
+};
+for (const [option, checkbox] of Object.entries(toggles)) {
+    checkbox.addEventListener("change", () => {
+        chart.setOptions({ [option]: checkbox.checked });
+    });
+}
+
+for (const control of [chartWidth, chartHeight]) {
+    control.addEventListener("change", () => {
+        if (chartWidth.checkValidity() && chartHeight.checkValidity()) {
+            chart.setOptions({
+                width: chartWidth.valueAsNumber,
+                height: chartHeight.valueAsNumber,
+            });
+        }
     });
 }

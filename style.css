@@ -100,11 +100,12 @@ select, input, button {
     background-color: var(--surface-bg);
 }
 
-/* The chart sizes its bitmap to this displayed size. */
+#chart-scroll {
+    overflow-x: auto;
+}
+
 #chart {
     display: block;
-    width: 100%;
-    height: clamp(320px, 50vw, 500px);
     border: var(--chart-border);
     box-sizing: border-box;
     background-color: var(--surface-bg);

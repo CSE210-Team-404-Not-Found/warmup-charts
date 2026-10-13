@@ -54,11 +54,17 @@ x,Revenue,Cost
 ## API
 
 ### `new Chart(canvas, options)`
-Creates a chart on a `<canvas>` element. The options are `showLine` (default
-`false`), the axis labels `xLabel` and `yLabel`, and the fixed axis ranges
-`xRange` and `yRange`, each given as `[start, end]`. Without a fixed range, an
-axis fits the data. Give the canvas its size in CSS; the chart sizes its bitmap
-to match, including on high-density screens.
+Creates a chart on a `<canvas>` element. The options are `width` and `height`
+in CSS pixels (default 800 × 450), `showLine` (default `false`), the axis labels
+`xLabel` and `yLabel`, and the fixed axis ranges `xRange` and `yRange`, each
+given as `[start, end]`. Without a fixed range, an axis fits the data. The
+chart sizes the canvas's bitmap to match its displayed size, including on
+high-density screens.
+
+`showAxes`, `showAxisLabels` and `showLegend` (all default `true`) turn those
+parts on and off. Small charts also drop them when they don't fit: axis labels
+below 240 × 200, the legend below 160 × 120 or when it would take over a quarter
+of the height, and axes below 120 × 100, leaving only the data.
 
 `setSeries(series, colors)` replaces the chart's data, with one CSS color per
 series in the same order. `setOptions(options)` merges new options into the

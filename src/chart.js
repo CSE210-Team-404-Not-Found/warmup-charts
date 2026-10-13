@@ -13,12 +13,25 @@ const FONT = "13px sans-serif";
 const LABEL_FONT = "14px sans-serif";
 const TEXT_COLOR = "#222";
 const AXIS_COLOR = "#666";
+const BACKGROUND = "#fff";
 
-const MARGIN = { left: 72, right: 24, top: 16, bottom: 64 };
+const EDGE = 4;
+const TICK_SPACE = { left: 40, bottom: 24, right: 24, top: 16 };
+const TITLE_SPACE = { left: 20, bottom: 36 };
+const TICK_LABEL_GAP = 10;
+const X_TITLE_OFFSET = 46;
+const Y_TITLE_X = 18;
+const LEGEND_INSET = 24;
+const LEGEND_GAP = 20;
+
+const TITLES_MIN = { width: 240, height: 200 };
+const LEGEND_MIN = { width: 160, height: 120 };
+const TICKS_MIN = { width: 120, height: 100 };
 const LEGEND_ROW = 24;
 const LEGEND_SWATCH = 10;
-const POINT_RADIUS = 3;
+const POINT_RADIUS = 4;
 const TICK_COUNT = 5;
+const TICK_GAP = { x: 50, y: 30 };
 
 export class Chart {
     #canvas;
@@ -30,9 +43,14 @@ export class Chart {
     #frame = 0;
 
     /**
-     * @param {HTMLCanvasElement} canvas  The canvas this chart draws on. Sized by CSS.
+     * @param {HTMLCanvasElement} canvas  The canvas this chart draws on.
      * @param {Object} [options]
+     * @param {number} [options.width]  Width in CSS pixels (default 800).
+     * @param {number} [options.height]  Height in CSS pixels (default 450).
      * @param {boolean} [options.showLine]  Connect points with lines.
+     * @param {boolean} [options.showAxes]  Axis lines and ticks (default true).
+     * @param {boolean} [options.showAxisLabels]  Axis labels (default true).
+     * @param {boolean} [options.showLegend]  Legend (default true).
      * @param {[number, number]} [options.xRange]  Fixed x axis start and end
      *     (default: fit the data).
      * @param {[number, number]} [options.yRange]  Fixed y axis start and end
@@ -45,11 +63,15 @@ export class Chart {
             throw new TypeError("Chart needs a <canvas> element");
         }
 
+        checkSize(options);
         this.#canvas = canvas;
         this.#ctx = canvas.getContext("2d");
         this.#options = {
-            showLine: false, xRange: null, yRange: null, xLabel: "", yLabel: "", ...options,
+            width: 800, height: 450, showLine: false,
+            showAxes: true, showAxisLabels: true, showLegend: true,
+            xRange: null, yRange: null, xLabel: "", yLabel: "", ...options,
         };
+        this.#applySize();
 
         // Fires once immediately, which gives the first draw.
         this.#observer = new ResizeObserver(() => this.#resize());
@@ -95,7 +117,9 @@ export class Chart {
 
     /** Merge new options in and redraw. */
     setOptions(options) {
+        checkSize(options);
         this.#options = { ...this.#options, ...options };
+        this.#applySize();
         this.requestDraw();
     }
 
@@ -122,10 +146,12 @@ export class Chart {
         const ratio = this.#canvas.width / width;
         ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
         ctx.clearRect(0, 0, width, height);
+        ctx.fillStyle = BACKGROUND;
+        ctx.fillRect(0, 0, width, height);
 
-        const legend = this.#layoutLegend(width);
-        const transform = this.#makeTransform(width, height, legend.height);
-        this.#drawAxes(transform);
+        const layout = this.#layout(width, height);
+        const transform = this.#makeTransform(width, height, layout);
+        this.#drawAxes(transform, layout);
 
         const pad = POINT_RADIUS + 1;
         ctx.save();
@@ -136,7 +162,12 @@ export class Chart {
         this.#series.forEach((s, i) => this.#drawSeries(transform, s, this.#colors[i]));
         ctx.restore();
 
-        this.#drawLegend(legend);
+        if (layout.legend) {
+            this.#drawLegend(layout.legend);
+        }
+        if (this.#series.every((s) => !s.points.length)) {
+            this.#drawNoData(transform);
+        }
     }
 
     /** Stop observing the canvas and cancel any pending draw. */
@@ -155,24 +186,44 @@ export class Chart {
         canvas.width = Math.round(width * ratio);
         canvas.height = Math.round(height * ratio);
 
-        // Keep an attribute-sized canvas from growing with the bitmap.
-        if (canvas.clientWidth !== width) {
-            canvas.style.width = `${width}px`;
-        }
-        if (canvas.clientHeight !== height) {
-            canvas.style.height = `${height}px`;
-        }
-
         // Resizing clears the canvas, so draw now.
         this.draw();
     }
 
+    /** Set the canvas's displayed size from options.width / height. */
+    #applySize() {
+        this.#canvas.style.width = `${this.#options.width}px`;
+        this.#canvas.style.height = `${this.#options.height}px`;
+    }
+
+    /** Margins, and which of the titles, legend and ticks are on and fit at this size. */
+    #layout(width, height) {
+        const { showAxes, showAxisLabels, showLegend } = this.#options;
+        const fits = (min) => width >= min.width && height >= min.height;
+        const ticks = showAxes && fits(TICKS_MIN);
+        const titles = showAxisLabels && fits(TITLES_MIN);
+        const edge = Math.min(EDGE, Math.floor(Math.min(width, height) / 3));
+        const margin = {
+            left: edge + (ticks ? TICK_SPACE.left : 0) + (titles ? TITLE_SPACE.left : 0),
+            right: ticks ? TICK_SPACE.right : edge,
+            top: ticks ? TICK_SPACE.top : edge,
+            bottom: edge + (ticks ? TICK_SPACE.bottom : 0) + (titles ? TITLE_SPACE.bottom : 0),
+        };
+
+        let legend = showLegend && fits(LEGEND_MIN) ? this.#layoutLegend(width) : null;
+        if (legend && (!legend.entries.length
+            || legend.bottom + LEGEND_GAP - margin.top > height / 4)) {
+            legend = null;
+        }
+        return { edge, margin, ticks, titles, legend };
+    }
+
     /** Data-to-pixel transform, using options.xRange / yRange. */
-    #makeTransform(width, height, legendHeight) {
-        const left = MARGIN.left;
-        const right = width - MARGIN.right;
-        const top = MARGIN.top + legendHeight;
-        const bottom = height - MARGIN.bottom;
+    #makeTransform(width, height, { margin, legend }) {
+        const left = margin.left;
+        const right = width - margin.right;
+        const top = legend ? legend.bottom + LEGEND_GAP : margin.top;
+        const bottom = height - margin.bottom;
         const xRange = this.#options.xRange ?? fitRange(this.#series, "xs");
         const yRange = this.#options.yRange ?? fitRange(this.#series, "ys");
         const [x0, x1] = xRange;
@@ -187,7 +238,17 @@ export class Chart {
     }
 
     /** Axes and axis labels. */
-    #drawAxes(transform) {
+    #drawAxes(transform, layout) {
+        if (layout.ticks) {
+            this.#drawTicks(transform);
+        }
+        if (layout.titles) {
+            this.#drawTitles(transform);
+        }
+    }
+
+    /** Axis lines, ticks and tick labels. */
+    #drawTicks(transform) {
         const ctx = this.#ctx;
         const { left, right, top, bottom } = transform;
 
@@ -203,40 +264,47 @@ export class Chart {
         ctx.fillStyle = TEXT_COLOR;
         ctx.textAlign = "center";
         ctx.textBaseline = "top";
-        for (const tick of ticks(transform.xRange)) {
+        for (const tick of ticks(transform.xRange, tickCount(right - left, TICK_GAP.x))) {
             const px = transform.toPx(tick);
             ctx.beginPath();
             ctx.moveTo(px, bottom);
             ctx.lineTo(px, bottom + 5);
             ctx.stroke();
-            ctx.fillText(formatTick(tick), px, bottom + 8);
+            ctx.fillText(formatTick(tick), px, bottom + TICK_LABEL_GAP);
         }
 
         ctx.textAlign = "right";
         ctx.textBaseline = "middle";
-        for (const tick of ticks(transform.yRange)) {
+        for (const tick of ticks(transform.yRange, tickCount(bottom - top, TICK_GAP.y))) {
             const py = transform.toPy(tick);
             ctx.beginPath();
             ctx.moveTo(left - 5, py);
             ctx.lineTo(left, py);
             ctx.stroke();
-            ctx.fillText(formatTick(tick), left - 8, py, MARGIN.left - 30);
+            ctx.fillText(formatTick(tick), left - TICK_LABEL_GAP, py,
+                TICK_SPACE.left - TICK_LABEL_GAP);
         }
+    }
 
+    /** Axis labels. */
+    #drawTitles(transform) {
+        const ctx = this.#ctx;
+        const { left, right, top, bottom } = transform;
         const { xLabel, yLabel } = this.#options;
+        ctx.fillStyle = TEXT_COLOR;
         ctx.font = LABEL_FONT;
         ctx.textAlign = "center";
-        ctx.textBaseline = "bottom";
-        ctx.fillText(xLabel, (left + right) / 2, bottom + MARGIN.bottom - 8, right - left);
+        ctx.textBaseline = "middle";
+        ctx.fillText(xLabel, (left + right) / 2, bottom + X_TITLE_OFFSET, right - left);
         ctx.save();
-        ctx.translate(16, (top + bottom) / 2);
+        ctx.translate(Y_TITLE_X, (top + bottom) / 2);
         ctx.rotate(-Math.PI / 2);
         ctx.textBaseline = "middle";
         ctx.fillText(yLabel, 0, 0, bottom - top);
         ctx.restore();
     }
 
-    /** Points, plus lines when options.showLine is set. */
+    /** Points, or lines when options.showLine is set. */
     #drawSeries(transform, series, color) {
         const ctx = this.#ctx;
         const { xs, ys, length } = series.points;
@@ -247,7 +315,8 @@ export class Chart {
         ctx.strokeStyle = color;
         ctx.fillStyle = color;
 
-        if (this.#options.showLine) {
+        // A single point has no line, so it is drawn as a point.
+        if (this.#options.showLine && length > 1) {
             series.points.sort();
             ctx.lineWidth = 2;
             ctx.beginPath();
@@ -256,6 +325,7 @@ export class Chart {
                 ctx.lineTo(transform.toPx(xs[i]), transform.toPy(ys[i]));
             }
             ctx.stroke();
+            return;
         }
 
         ctx.beginPath();
@@ -274,22 +344,21 @@ export class Chart {
         ctx.font = FONT;
 
         const entries = [];
-        const maxTextWidth = width - MARGIN.left - MARGIN.right - LEGEND_SWATCH - 8;
-        let x = MARGIN.left;
-        let y = MARGIN.top + LEGEND_ROW / 2;
+        const maxTextWidth = width - 2 * LEGEND_INSET - LEGEND_SWATCH - 18;
+        let x = LEGEND_INSET;
+        let y = LEGEND_INSET;
         this.#series.forEach((s, i) => {
             const textWidth = Math.min(ctx.measureText(s.name).width, maxTextWidth);
-            const entryWidth = LEGEND_SWATCH + 8 + textWidth + 24;
-            if (x > MARGIN.left && x + entryWidth > width - MARGIN.right) {
-                x = MARGIN.left;
+            const entryWidth = LEGEND_SWATCH + 8 + textWidth + 26;
+            if (x > LEGEND_INSET && x + entryWidth > width - LEGEND_INSET) {
+                x = LEGEND_INSET;
                 y += LEGEND_ROW;
             }
             entries.push({ name: s.name, color: this.#colors[i], x, y, textWidth });
             x += entryWidth;
         });
 
-        const height = entries.length ? y - MARGIN.top + LEGEND_ROW / 2 : 0;
-        return { entries, height };
+        return { entries, bottom: y + LEGEND_ROW / 2 };
     }
 
     /** Legend, using each series' name and color. */
@@ -303,6 +372,27 @@ export class Chart {
             ctx.fillRect(entry.x, entry.y - LEGEND_SWATCH / 2, LEGEND_SWATCH, LEGEND_SWATCH);
             ctx.fillStyle = TEXT_COLOR;
             ctx.fillText(entry.name, entry.x + LEGEND_SWATCH + 8, entry.y, entry.textWidth || 1);
+        }
+    }
+
+    /** "No data", centered in the plot. */
+    #drawNoData(transform) {
+        const ctx = this.#ctx;
+        ctx.font = FONT;
+        ctx.fillStyle = TEXT_COLOR;
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillText("No data", (transform.left + transform.right) / 2,
+            (transform.top + transform.bottom) / 2);
+    }
+}
+
+/** Throw if options.width or options.height is set but not a positive size. */
+function checkSize(options) {
+    for (const name of ["width", "height"]) {
+        const value = options[name];
+        if (value !== undefined && !(Number.isFinite(value) && value > 0)) {
+            throw new RangeError(`Chart ${name} must be a positive number of pixels`);
         }
     }
 }
@@ -328,9 +418,14 @@ function fitRange(series, axis) {
     return [Math.floor(min / step) * step, Math.ceil(max / step) * step];
 }
 
+/** Number of ticks for an axis of this length, at most TICK_COUNT. */
+function tickCount(length, gap) {
+    return Math.max(1, Math.min(TICK_COUNT, Math.floor(length / gap)));
+}
+
 /** Tick spacing: 1, 2 or 5 times a power of ten. */
-function tickStep(span) {
-    const raw = span / TICK_COUNT;
+function tickStep(span, count = TICK_COUNT) {
+    const raw = span / count;
     const power = 10 ** Math.floor(Math.log10(raw));
     const scaled = raw / power;
     if (scaled < 1.5) {
@@ -346,14 +441,14 @@ function tickStep(span) {
 }
 
 /** Tick values within a range. */
-function ticks([start, end]) {
+function ticks([start, end], count) {
     const low = Math.min(start, end);
     const high = Math.max(start, end);
     if (!(high > low) || !Number.isFinite(high - low)) {
         return [];
     }
 
-    const step = tickStep(high - low);
+    const step = tickStep(high - low, count);
     const first = Math.ceil(low / step);
     const last = Math.floor(high / step);
     const result = [];
