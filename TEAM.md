@@ -26,3 +26,4 @@ I presume we are all familiar with `git` at this point. If you need further guid
 - **Albert** (Video/Frontend): First-year Master's student, interested in machine learning, AI systems/integration, web/app development, and bioinformatics.
 - **Tony** (Backend): First-year MS CS student, focused on backend engineering, including a Steam database system.
 - **Evan** (Frontend): Second-year MS CS student, interested in UI/UX, computing accessibility, computer vision, and AI.
+- **Jason** (Backend): First-year MS CS student with a generalization in full-stack work. Interested in ML and robotics.
