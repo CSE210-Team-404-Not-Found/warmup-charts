@@ -1,5 +1,117 @@
-/* 
+/*
     Page styles (for frontend team)
 
     Feel free to link in other new CSS files for structuring purposes!
 */
+
+:root {
+    --page-bg: #ffffff;
+    --surface-bg: #ffffff;
+    --text-color: #222222;
+    --title-color: #222222;
+    --subtitle-color: #555555;
+    --header-border: 1px solid #aaaaaa;
+    --chart-border: 1px solid #aaaaaa;
+    --error-color: #990000;
+}
+
+/* Toggled by demo/theme.js. */
+:root[data-theme="seven-eleven"] {
+    --primary-bg-color: #008061;
+    --secondary-bg-color: #ffffff;
+    --tertiary-bg-color: #dbede8;
+    --primary-accent-color: #ed1b2d;
+    --secondary-accent-color: #f5821f;
+
+    --page-bg: var(--tertiary-bg-color);
+    --surface-bg: var(--secondary-bg-color);
+    --title-color: var(--primary-accent-color);
+    --subtitle-color: var(--secondary-accent-color);
+    --header-border: 3vmin solid var(--primary-bg-color);
+    --chart-border: 3px solid var(--primary-bg-color);
+    --error-color: var(--primary-accent-color);
+}
+
+body {
+    margin: 0;
+    font-family: system-ui, sans-serif;
+    color: var(--text-color);
+    background-color: var(--page-bg);
+}
+
+/* header */
+header {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 2vmin;
+    background-color: var(--surface-bg);
+    border: var(--header-border);
+    padding: 2vmin;
+}
+
+hgroup h1 {
+    margin: 0;
+    color: var(--title-color);
+}
+
+hgroup p {
+    margin: 0;
+    font-size: 1.5rem;
+    font-weight: bold;
+    color: var(--subtitle-color);
+}
+
+main {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 2vmin;
+    max-width: 1000px;
+    margin: 3vmin auto;
+    padding: 0 3vmin;
+}
+
+section {
+    display: grid;
+    align-content: start;
+    row-gap: 1vmin;
+}
+
+/* Everything after the two control sections spans both columns. */
+main > :not(section) {
+    grid-column: 1 / -1;
+}
+
+select, input, button {
+    font: inherit;
+    padding: 4px;
+}
+
+#dataset-name {
+    margin: 0;
+}
+
+#message {
+    margin: 0;
+    padding: 8px 12px;
+    border: 1px solid var(--error-color);
+    color: var(--error-color);
+    background-color: var(--surface-bg);
+}
+
+/* The chart sizes its bitmap to this displayed size. */
+#chart {
+    display: block;
+    width: 100%;
+    height: clamp(320px, 50vw, 500px);
+    border: var(--chart-border);
+    box-sizing: border-box;
+    background-color: var(--surface-bg);
+}
+
+@media (max-width: 600px) {
+    main {
+        grid-template-columns: 1fr;
+    }
+}

@@ -55,8 +55,10 @@ x,Revenue,Cost
 
 ### `new Chart(canvas, options)`
 Creates a chart on a `<canvas>` element. The options are `showLine` (default
-`false`) and the fixed axis ranges `xRange` and `yRange`, each given as
-`[start, end]`.
+`false`), the axis labels `xLabel` and `yLabel`, and the fixed axis ranges
+`xRange` and `yRange`, each given as `[start, end]`. Without a fixed range, an
+axis fits the data. Give the canvas its size in CSS; the chart sizes its bitmap
+to match, including on high-density screens.
 
 `setSeries(series, colors)` replaces the chart's data, with one CSS color per
 series in the same order. `setOptions(options)` merges new options into the
@@ -123,7 +125,7 @@ and a malformed file for testing how invalid input is handled.
 | `src/series.js` | Both | `Series`, which passes data from the backend to the frontend |
 | `src/point-set.js` | Backend | `PointSet`, which stores each series' points |
 | `src/data.js` | Backend | `parseCSV(text)` and `randomData(options)`, both returning `Series[]` |
-| `index.html`, `style.css`, `demo/main.js` | Frontend | Demo page using the library |
+| `index.html`, `style.css`, `demo/` | Frontend | Demo page using the library, with a 7-11 theme toggle |
 | `data/` | Backend | Sample CSVs |
 | `test/` | Backend | Unit tests for the library |
 | `docs/decisions/` | Leads | Architecture Decision Records (MADR) |
