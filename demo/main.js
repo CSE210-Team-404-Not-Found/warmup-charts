@@ -2,7 +2,7 @@
  * The demo page's script.
  *
  * Owned by the frontend team.
- * 
+ *
  * Currently displays one chart with random data until a CSV file is chosen.
  * For the frontend team to discuss and expand upon.
  */
@@ -29,6 +29,8 @@ show(randomData());
 
 input.addEventListener("change", async () => {
     const file = input.files[0];
-    if (!file) return;
+    if (!file) {
+        return;
+    }
     show(parseCSV(await file.text()));
 });

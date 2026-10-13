@@ -26,8 +26,9 @@ export class Chart {
      * @param {[number, number]} [options.yRange]  Fixed y axis start and end.
      */
     constructor(canvas, options = {}) {
-        if (!(canvas instanceof HTMLCanvasElement))
+        if (!(canvas instanceof HTMLCanvasElement)) {
             throw new TypeError("Chart needs a <canvas> element");
+        }
 
         this.#canvas = canvas;
         this.#ctx = canvas.getContext("2d");
@@ -57,11 +58,14 @@ export class Chart {
      * @param {string[]} colors  CSS colors, one per series, in the same order.
      */
     setSeries(series, colors) {
-        for (const s of series)
-            if (!(s instanceof Series))
+        for (const s of series) {
+            if (!(s instanceof Series)) {
                 throw new TypeError("setSeries takes an array of Series");
-        if (!Array.isArray(colors) || colors.length !== series.length)
+            }
+        }
+        if (!Array.isArray(colors) || colors.length !== series.length) {
             throw new RangeError("setSeries needs one color per series");
+        }
 
         this.#series = [...series];
         this.#colors = [...colors];
@@ -80,7 +84,9 @@ export class Chart {
 
     /** Schedule a redraw on the next frame. Repeated calls share one draw. */
     requestDraw() {
-        if (this.#frame) return;
+        if (this.#frame) {
+            return;
+        }
         this.#frame = requestAnimationFrame(() => {
             this.#frame = 0;
             this.draw();
