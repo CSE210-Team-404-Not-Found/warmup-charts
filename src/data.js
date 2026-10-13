@@ -107,9 +107,6 @@ export function parseCSV(text, { onWarning } = {}) {
     if ((warnings.skippedRows || warnings.skippedCells) && onWarning) {
         onWarning(warnings);
     }
-    for (const column of columns) {
-        column.sort();
-    }
     return names.map((name, i) => new Series(name, columns[i]));
 }
 

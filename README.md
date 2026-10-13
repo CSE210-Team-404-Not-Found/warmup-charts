@@ -75,9 +75,15 @@ const series = new Series("Revenue", PointSet.fromArrays([0, 1, 2], [1.2, 1.5, 1
 ```
 
 ### `PointSet`
-Holds points sorted by x, stored as `Float32Array`s. `PointSet.fromArrays(xs, ys)`
-copies existing arrays into a new set. To load points individually, create a
-set with a fixed capacity, push the points in any order, and call `sort()`.
+Holds points stored as `Float32Array`s, in the order they were added.
+`PointSet.fromArrays(xs, ys)` copies existing arrays into a new set. To load
+points individually, create a set with a fixed capacity and push the points in
+any order.
+
+`sort()` sorts the points by x, then y, in place without allocating. It is a
+no-op if they are already sorted, and `sorted` reports whether they are. A
+chart sorts a series only to draw it as a line; scatter plots are drawn in
+any order.
 
 ```js
 const points = new PointSet(1000);
@@ -87,7 +93,8 @@ points.sort();
 ```
 
 `push` throws if the set is full. `xs` and `ys` return the stored coordinates
-as read-only views, and `start` and `end` return the first and last points.
+as read-only views, and `start` and `end` return the first and last points in
+sort order, without sorting.
 
 Coordinates are stored with about 7 significant digits of precision, which is
 insufficient for large x values such as Unix timestamps.

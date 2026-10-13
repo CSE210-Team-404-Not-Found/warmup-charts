@@ -248,6 +248,7 @@ export class Chart {
         ctx.fillStyle = color;
 
         if (this.#options.showLine) {
+            series.points.sort();
             ctx.lineWidth = 2;
             ctx.beginPath();
             ctx.moveTo(transform.toPx(xs[0]), transform.toPy(ys[0]));
