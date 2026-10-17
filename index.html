@@ -24,6 +24,10 @@
                 <option value="malformed">Malformed</option>
                 <option value="multi-series">Multi-series</option>
                 <option value="single-series">Single-series</option>
+                <option value="large-series">Large-series</option>
+                <option value="negative-series">Negative-series</option>
+                <option value="decimal-series">Decimal-series</option>
+                <option value="simple-series">Simple-series</option>
             </select>
             <label for="csv-input">CSV Input</label>
             <input type="file" id="csv-input" accept=".csv,text/csv">
@@ -48,6 +52,7 @@
         </section>
         <h2 id="dataset-name"></h2>
         <p id="message" role="alert" hidden></p>
+        <div id="tooltip" hidden></div>
         <div id="chart-scroll">
             <canvas id="chart"></canvas>
         </div>

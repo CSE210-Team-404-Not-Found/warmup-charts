@@ -100,6 +100,17 @@ select, input, button {
     background-color: var(--surface-bg);
 }
 
+#tooltip {
+  position: fixed;
+  pointer-events: none;
+  background: rgba(0,0,0,0.8);
+  color: white;
+  padding: 6px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  z-index: 10;
+}
+
 #chart-scroll {
     overflow-x: auto;
 }

@@ -17,7 +17,11 @@ const chartWidth = document.getElementById("chart-width");
 const chartHeight = document.getElementById("chart-height");
 const datasetName = document.getElementById("dataset-name");
 const message = document.getElementById("message");
+const canvas = document.getElementById("chart");
+const tooltip = document.getElementById("tooltip");
 
+// this variable is not the same as the HTML canvas element 
+// it is the Chart object that wraps the canvas and provides charting functionality
 const chart = new Chart(document.getElementById("chart"), {
     width: chartWidth.valueAsNumber,
     height: chartHeight.valueAsNumber,
@@ -132,3 +136,26 @@ for (const control of [chartWidth, chartHeight]) {
         }
     });
 }
+
+// Add an event listener to the canvas for pointer movement to add tooltips.
+canvas.addEventListener("pointermove", (event) => {
+    const rect = canvas.getBoundingClientRect();
+    const x = event.clientX - rect.left;
+    const y = event.clientY - rect.top;
+
+    // Use findNearestPoint on chart NOT canvas or rect bc canvas is just the HTML element, chart is the object that wraps it and provides charting functionality.
+    const hit = chart.findNearestPoint(x, y, 8);
+    if (!hit) {
+        tooltip.hidden = true;
+        return;
+    }
+
+    tooltip.hidden = false;
+    tooltip.textContent = `${hit.series.name}: (${hit.x}, ${hit.y})`;
+    tooltip.style.left = `${event.clientX + 10}px`;
+    tooltip.style.top = `${event.clientY + 10}px`;
+});
+
+canvas.addEventListener("pointerleave", () => {
+    tooltip.hidden = true;
+});
