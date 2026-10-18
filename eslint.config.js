@@ -16,7 +16,7 @@ export default [
     }),
 
     {
-        files: ["src/**/*.js", "demo/**/*.js"],
+        files: ["src/**/*.js", "demo/**/*.js", "benchmark/**/*.js"],
         languageOptions: { globals: globals.browser },
     },
     {
