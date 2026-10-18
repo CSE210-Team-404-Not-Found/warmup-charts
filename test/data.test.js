@@ -210,3 +210,11 @@ test("sparse columns do not leak points between series", () => {
     assert.ok(Array.from(a.points.xs).every((x) => x % 2 === 1));
     assert.ok(Array.from(b.points.xs).every((x) => x % 2 === 0));
 });
+
+test("timestamps as x collapse under float32 storage, as documented", async () => {
+    const csv = await readFile(new URL("../data/timestamps.csv", import.meta.url), "utf8");
+    const [series] = parseCSV(csv, {
+        onWarning: () => assert.fail("Rounding is not reported"),
+    });
+    assert.deepEqual(Array.from(series.points.xs), Array(4).fill(Math.fround(1700000000000)));
+});
