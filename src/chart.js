@@ -161,21 +161,19 @@ export class Chart {
 
         const layout = this.#layout(width, height);
         const transform = this.#makeTransform(width, height, layout);
-        this.#drawAxes(transform, layout);
 
         const totalPoints = this.#series.reduce((sum, series) => sum + series.points.length, 0);
-        // Keep ordinary plots and line charts on the existing synchronous path.
         const recordedGeneration = ++this.#currDrawGeneration;
-        // MAPREDUCE RENDER only if >= WORKER_MIN_POINTS and no lines, because lines are drawn in order.
+        let workerRenderScheduled = false;
         if (!this.#options.showLine && totalPoints >= WORKER_MIN_POINTS) {
             try {
+                // create render scheduler if it hasn't been created yet
                 if (!this.#schedulerInitAttempted) {
                     this.#schedulerInitAttempted = true;
-                    this.#renderScheduler = RenderScheduler.create();
+                    this.#renderScheduler = new RenderScheduler();
                 }
-                if (!this.#renderScheduler) {
-                    this.#drawSeriesOnMain(transform);
-                } else {
+                // attempt distrubuted render 
+                if (this.#renderScheduler) {
                     this.#renderScheduler.setSeries(this.#series);
                     this.#renderScheduler.render({
                         width,
@@ -185,35 +183,43 @@ export class Chart {
                         ratio,
                         pointRadius: POINT_RADIUS,
                         transform,
-                    }, (bitmap, task) => {
+                    }, 
+                    // draw bitmap onto staging canvas if draw generation hasn't changed since the render was scheduled
+                    (bitmap, task) => {
                         if (recordedGeneration === this.#currDrawGeneration) {
                             this.#compositeBitmaps(
                                 bitmap, task, this.#colors[task.seriesIndex], width, height, ratio);
                         }
-                        // A stale result is ignored above, but its bitmap still needs releasing.
                         bitmap.close();
-                    }, () => recordedGeneration === this.#currDrawGeneration).catch((error) => {
+                    }, 
+                    // callback to inform scheduler if current render is still valid 
+                    // passes only if the draw generation hasn't changed since the render was scheduled
+                    // and bitmap generation succeeds
+                    () => recordedGeneration === this.#currDrawGeneration).catch((error) => {
                         if (recordedGeneration !== this.#currDrawGeneration) {
                             return;
                         }
-                        console.error("Worker rendering failed; using the main thread renderer.",
-                            error);
+                        // callback is async and triggers during each render batch, so can occur after draw() completes
+                        // if a worker fails, assume somethings wrong with the scheduling system
+                        // and destroy the scheduler and fall back to single-threaded rendering for all future requests
+                        console.error("Worker rendering failed; using the main thread renderer.", error);
                         this.#renderScheduler?.destroy();
                         this.#renderScheduler = null;
                         this.draw();
                     });
+                    workerRenderScheduled = true;
                 }
             } catch (error) {
-                console.error("Worker rendering could not start; using the main thread renderer.",
-                    error);
+                console.error("Worker rendering could not start; using the main thread renderer.", error);
                 this.#renderScheduler?.destroy();
                 this.#renderScheduler = null;
-                this.#drawSeriesOnMain(transform);
             }
-        } else {
-            this.#drawSeriesOnMain(transform);
+        }
+        if (!workerRenderScheduled) {
+            this.#renderSingleThreaded(transform);
         }
 
+        this.#drawAxes(transform, layout);
         if (layout.legend) {
             this.#drawLegend(layout.legend);
         }
@@ -222,7 +228,12 @@ export class Chart {
         }
     }
 
-    #drawSeriesOnMain(transform) {
+    /**
+     * Draws all series on the main thread.
+     *
+     * @param {{left: number, top: number, right: number, bottom: number}} transform Plot-area bounds in canvas coordinates.
+     */
+    #renderSingleThreaded(transform) {
         const ctx = this.#ctx;
         const pad = POINT_RADIUS + 1;
         ctx.save();
@@ -233,81 +244,59 @@ export class Chart {
         this.#series.forEach((s, i) => this.#drawSeries(transform, s, this.#colors[i]));
         ctx.restore();
     }
-
+    
     /**
- * Accumulates a worker-rendered series mask, colors it, and draws it onto
- * the visible chart once all chunks for that series have arrived.
- *
- * The worker renders the series as a white mask on a transparent background.
- * Chunks are combined on a separate offscreen canvas so they can be tinted
- * together without changing the visible chart until the series is complete.
- *
- * @param {ImageBitmap} bitmap Rendered mask for one chunk of a series.
- * @param {Object} task Chunk metadata, including its index and whether it is
- *     the final chunk for the series.
- * @param {string} color CSS color to apply to the completed mask.
- * @param {number} width Canvas width in CSS pixels.
- * @param {number} height Canvas height in CSS pixels.
- * @param {number} ratio Scale from CSS pixels to backing-bitmap pixels.
- */
-#compositeBitmaps(bitmap, task, color, width, height, ratio) {
-    // Create the offscreen canvas on demand; keep it for reuse between draws.
-    if (!this.#stagingCanvas) {
-        this.#stagingCanvas = this.#canvas.ownerDocument.createElement("canvas");
-        this.#stagingCanvasContext = this.#stagingCanvas.getContext("2d");
-        if (!this.#stagingCanvasContext) {
-            throw new Error("Could not create a chart worker-composition context.");
+     * Composites a worker-rendered bitmap into the staging canvas as masks. 
+     * The first chunk clears the offscreen canvas
+     * After the last chunk of a series, the mask is colored and drawn onto the main canvas. 
+     *
+     * @param {ImageBitmap} bitmap Rendered mask for one chunk.
+     * @param {{seriesIndex: number, chunkIndex: number, lastChunk: boolean}} task
+     *     Metadata identifying the series and chunk.
+     * @param {string} color CSS color to apply to the completed series mask.
+     * @param {number} width Canvas width in CSS pixels.
+     * @param {number} height Canvas height in CSS pixels.
+     * @param {number} ratio Scale from CSS pixels to backing-bitmap pixels.
+     */
+    #compositeBitmaps(bitmap, task, color, width, height, ratio) {
+
+        // Create the staging canvas 
+        if (!this.#stagingCanvas) {
+            this.#stagingCanvas = this.#canvas.ownerDocument.createElement("canvas");
+            this.#stagingCanvasContext = this.#stagingCanvas.getContext("2d");
         }
-    }
+        const ctx = this.#stagingCanvasContext;
+        if (this.#stagingCanvas.width !== this.#canvas.width
+            || this.#stagingCanvas.height !== this.#canvas.height) {
+            this.#stagingCanvas.width = this.#canvas.width;
+            this.#stagingCanvas.height = this.#canvas.height;
+        }
+        ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
 
-    // Match the offscreen bitmap dimensions to the visible canvas, including
-    // its device-pixel-ratio scaling.
-    if (this.#stagingCanvas.width !== this.#canvas.width
-        || this.#stagingCanvas.height !== this.#canvas.height) {
-        this.#stagingCanvas.width = this.#canvas.width;
-        this.#stagingCanvas.height = this.#canvas.height;
-    }
+        // clear staging canvas in preparation for first bitmap of new series
+        if (task.chunkIndex === 0) {
+            ctx.globalCompositeOperation = "source-over";
+            ctx.clearRect(0, 0, width, height);
+        }
 
-    const ctx = this.#stagingCanvasContext;
+        // Add this task's bitmap to staging canvas.
+        ctx.drawImage(bitmap, 0, 0, width, height);
 
-    // Use CSS-pixel drawing coordinates while scaling them to backing pixels,
-    // just as the visible chart context does.
-    ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
+        // Wait until every bitmap in this series has been accumulated 
+        if (!task.lastChunk) {
+            return;
+        }
 
-    if (task.chunkIndex === 0) {
-        // Start a fresh mask for this series. source-over lets later chunks
-        // accumulate on top of the earlier ones.
+        // source-in makes the fillRect only fill/color the masked dots, therein coloring only the dots
+        ctx.globalCompositeOperation = "source-in";
+        ctx.fillStyle = color;
+        ctx.fillRect(0, 0, width, height);
         ctx.globalCompositeOperation = "source-over";
-        ctx.clearRect(0, 0, width, height);
+
+        // copy the rendered series onto main canvas
+        this.#ctx.drawImage(this.#stagingCanvas, 0, 0, width, height);
     }
-
-    // Add this chunk's mask to the offscreen canvas.
-    ctx.drawImage(bitmap, 0, 0, width, height);
-
-    // Wait until every chunk for this series has been accumulated before
-    // coloring or displaying it.
-    if (!task.lastChunk) {
-        return;
-    }
-
-    // console.log(`took ${(performance.now() - t0).toFixed(3)} ms`)
-
-    // Keep the color only where the accumulated mask has opacity. This turns
-    // the worker's white mask into a mask in the series' assigned color.
-    // source-in makes the fillRect only fill the masked dots, therein coloring only the dots
-    ctx.globalCompositeOperation = "source-in";
-    ctx.fillStyle = color;
-    ctx.fillRect(0, 0, width, height);
-    // Restore normal compositing
-    ctx.globalCompositeOperation = "source-over";
-
-    // copy the completed colored series ontothe visible chart.
-    this.#ctx.drawImage(this.#stagingCanvas, 0, 0, width, height);
-
-    // Clear the offscreen mask so it cannot affect the next series.
-    ctx.clearRect(0, 0, width, height);
-}
-
+    
     /** Stop observing the canvas and cancel any pending draw. */
     destroy() {
         this.#observer.disconnect();

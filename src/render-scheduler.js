@@ -1,7 +1,19 @@
 const MAX_CHUNK_SIZE = 8192;
-const MAX_WORKERS = 32;
+const MAX_WORKERS = 32; // maximum number of workers to use, even if the system has more/less cores
 
-/** Split a point array into contiguous ranges that cover every point once. */
+/**
+ * Creates contiguous, non-overlapping chunk index ranges for a given pointset 
+ * based on it's length.
+ *
+ * Each range uses an inclusive `start` and exclusive `end`, and the ranges
+ * together cover every index from `0` to `length - 1`. Returns an empty array
+ * when `length` is zero.
+ *
+ * @param {number} length Number of points to partition; must be a non-negative safe integer.
+ * @param {number} maxChunkSize Maximum number of points in each chunk; must be a positive safe integer.
+ * @returns {{start: number, end: number}[]} Chunk ranges in ascending index order.
+ * @throws {RangeError} If either argument is outside its valid range.
+ */
 export function createChunkIndices(length, maxChunkSize) {
     if (!Number.isSafeInteger(length) || length < 0
         || !Number.isSafeInteger(maxChunkSize) || maxChunkSize < 1) {
@@ -32,21 +44,22 @@ export class RenderScheduler {
     #nextRequestId = 0;
     #destroyed = false;
 
-    static create() {
+    /** Start a bounded pool, leaving at least one reported core for the page. */
+    constructor() {
+        // checks for available cores for worker threads
         if (typeof Worker === "undefined" || typeof OffscreenCanvas === "undefined"
             || typeof OffscreenCanvas.prototype.transferToImageBitmap !== "function") {
-            return null;
+            throw new Error("Worker rendering is not supported in this environment.");
         }
-
         const cores = typeof navigator === "undefined" ? 2 : navigator.hardwareConcurrency || 2;
-        const count = Math.max(1, Math.min(MAX_WORKERS, cores - 1));
-        return new RenderScheduler(count);
-    }
+        // if system has only one core count resolves to 0
+        // and create() returns null, which is expected behavior
+        // will be handled by draw()'s try catch and fallback to synchronous single-threaded rendering
+        const count = Math.min(MAX_WORKERS, cores - 1);
 
-    /** Start a bounded pool, leaving at least one reported core for the page. */
-    constructor(count) {
         this.#workers = [];
         try {
+            // create count number of workers and set up event listeners for each worker
             for (let i = 0; i < count; i++) {
                 const worker = new Worker(new URL("./worker.js", import.meta.url), {
                     type: "module",
@@ -68,7 +81,13 @@ export class RenderScheduler {
         }
     }
 
-    /** Copy and distribute each series' points; transfers leave source arrays intact. */
+    /**
+     * Distributes each series' point data to the workers in transferable chunks.
+     * If the same series array is already loaded, leaves the worker data intact.
+     *
+     * @param {import("./series.js").Series[]} series Series whose points will be rendered.
+     * @throws {Error} If the worker pool has been destroyed.
+     */
     setSeries(series) {
         if (this.#destroyed) {
             throw new Error("The rendering worker pool has been destroyed.");
@@ -77,6 +96,7 @@ export class RenderScheduler {
             return;
         }
 
+        // clear all worker data before sending new series data.
         for (const worker of this.#workers) {
             worker.postMessage({ type: "clear-data" });
         }
@@ -84,17 +104,18 @@ export class RenderScheduler {
         this.#tasks = [];
 
         let nextWorker = 0;
-        // for each data series: 
+        // for each series
         for (let seriesIndex = 0; seriesIndex < series.length; seriesIndex++) {
             const { xs, ys, length } = series[seriesIndex].points;
             const chunk_indicies = createChunkIndices(length, MAX_CHUNK_SIZE);
+            // send each chunk to a worker in round-robin order
             for (let chunkIndex = 0; chunkIndex < chunk_indicies.length; chunkIndex++) {
                 const { start, end } = chunk_indicies[chunkIndex];
                 const workerIndex = nextWorker++ % this.#workers.length;
                 const key = `${seriesIndex}:${chunkIndex}`;
                 const chunkXs = xs.slice(start, end);
                 const chunkYs = ys.slice(start, end);
-                // Transfer these chunk copies to avoid cloning them a second time.
+                // Transfer chunk buffers to avoid cloning them a second time.
                 this.#workers[workerIndex].postMessage({
                     type: "set-data",
                     key,
@@ -112,22 +133,39 @@ export class RenderScheduler {
         }
     }
 
-    /** Render in bounded batches and release obsolete worker results promptly. */
+    /**
+     * Renders the scheduled chunks in batches, passing each current bitmap to
+     * `onBitmap` and closing results if the draw becomes stale.
+     *
+     * @param {{width: number, height: number, pixelWidth: number, pixelHeight: number,
+     *     ratio: number, pointRadius: number, transform: {
+     *         left: number, right: number, top: number, bottom: number,
+     *         xRange: [number, number], yRange: [number, number]
+     *     }}} options Canvas dimensions, scale, point radius, and plot transform.
+     * @param {(bitmap: ImageBitmap, task: {
+     *     key: string, workerIndex: number, seriesIndex: number, chunkIndex: number,
+     *     lastChunk: boolean
+     * }) => void} onBitmap Called for each bitmap while the draw is current.
+     * @param {() => boolean} isCurrent Returns whether this render is still current.
+     * @returns {Promise<void>} Resolves when rendering completes or becomes stale.
+     * @throws {Error} If the worker pool is destroyed or a render or callback fails.
+     */
     async render({ width, height, pixelWidth, pixelHeight, ratio, pointRadius, transform },
         onBitmap, isCurrent) {
         if (this.#destroyed) {
             throw new Error("The rendering worker pool has been destroyed.");
         }
-        // Limit in-flight bitmaps to one batch so large datasets do not spike memory use.
+        // Process the tasks in batches of one per worker
+        // If the draw becomes stale, stop processing and close ny bitmaps that were already returned.
         for (let start = 0; start < this.#tasks.length; start += this.#workers.length) {
+            // draw is stale
             if (!isCurrent()) {
                 return;
             }
+            // send render request to workers for current batch of tasks and wait for all results
             const tasks = this.#tasks.slice(start, start + this.#workers.length);
             const results = await Promise.allSettled(tasks.map((task) => this.#renderTask(
                 task, { width, height, pixelWidth, pixelHeight, ratio, pointRadius, transform })));
-                
-
             const bitmaps = [];
             let failure;
             for (const result of results) {
@@ -138,6 +176,7 @@ export class RenderScheduler {
                 }
             }
             
+            // draw is stale after async batch render finished
             if (!isCurrent()) {
                 for (const bitmap of bitmaps) {
                     bitmap.close();
@@ -150,7 +189,7 @@ export class RenderScheduler {
                 }
                 throw failure;
             }
-
+            // call onBitmap for postprocessing on each bitmap of the batch
             for (let i = 0; i < bitmaps.length; i++) {
                 try {
                     onBitmap(bitmaps[i], tasks[i]);
@@ -176,7 +215,13 @@ export class RenderScheduler {
         this.#fail(new Error("The rendering worker pool was destroyed."));
     }
 
-    /** Resolve the matching render request, or dispose of an obsolete bitmap. */
+    /**
+     * Resolves or rejects the pending render request for a worker response.
+     * Closes the bitmap if the response no longer matches a pending request.
+     *
+     * @param {{requestId: number, bitmap?: ImageBitmap, error?: string}} message Response sent by a rendering worker.
+     * @returns {void}
+     */
     #onMessage(message) {
         const pending = this.#pending.get(message.requestId);
         if (!pending) {
@@ -191,7 +236,18 @@ export class RenderScheduler {
         }
     }
 
-    /** Send one chunk's render parameters to its assigned worker. */
+    /**
+     * Sends one task's render request to its assigned worker.
+     *
+     * @param {{key: string, workerIndex: number}} task Chunk key and assigned worker index.
+     * @param {{width: number, height: number, pixelWidth: number, pixelHeight: number,
+     *     ratio: number, pointRadius: number, transform: {
+     *         left: number, right: number, top: number, bottom: number,
+     *         xRange: [number, number], yRange: [number, number]
+     *     }}} options Canvas dimensions, scale, point radius, and plot transform.
+     * @returns {Promise<ImageBitmap>} Resolves with the rendered chunk bitmap.
+     * @throws {Error} If posting the render request to the worker fails.
+     */
     #renderTask(task, {
         width, height, pixelWidth, pixelHeight, ratio, pointRadius, transform,
     }) {

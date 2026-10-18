@@ -5,7 +5,10 @@ const data = new Map();
 let canvas;
 let ctx;
 
-// Keep data in the worker between draws so resize and option changes send only render settings.
+/**
+ * Handles commands from the main thread to clear stored data, load point
+ * chunks, or render a chunk and return its bitmap.
+ */
 self.addEventListener("message", (event) => {
     const message = event.data;
     if (message.type === "clear-data") {
@@ -24,9 +27,19 @@ self.addEventListener("message", (event) => {
     }
 });
 
-/** Draw one chunk as an opaque mask and return it for main-thread tinting. */
+/**
+ * Renders a stored chunk as a white mask and sends its bitmap to the scheduler.
+ *
+ * @param {{requestId: number, key: string, width: number, height: number,
+ *     pixelWidth: number, pixelHeight: number, ratio: number, pointRadius: number,
+ *     left: number, right: number, top: number, bottom: number,
+ *     x0: number, x1: number, y0: number, y1: number}} message Render request
+ *     containing the chunk key, canvas dimensions, scale, point radius, and plot bounds.
+ * @returns {void}
+ */
 function render(message) {
     try {
+        // create a reusable OffscreenCanvas and context if it doesn't exist
         if (!canvas) {
             canvas = new OffscreenCanvas(message.pixelWidth, message.pixelHeight);
             ctx = canvas.getContext("2d");
@@ -38,22 +51,21 @@ function render(message) {
             canvas.width = message.pixelWidth;
             canvas.height = message.pixelHeight;
         }
-
+        // retrieve the chunk's point data from memory
         const points = data.get(message.key);
         if (!points) {
             throw new Error(`Worker data is missing for chunk ${message.key}.`);
         }
         const { xs, ys } = points;
+        // draw chunk
         ctx.setTransform(message.ratio, 0, 0, message.ratio, 0, 0);
         ctx.clearRect(0, 0, message.width, message.height);
         ctx.save();
         ctx.beginPath();
-        // Match the chart's clipping margin so edge points remain visible.
         const pad = message.pointRadius + 1;
         ctx.rect(message.left - pad, message.top - pad,
             message.right - message.left + 2 * pad, message.bottom - message.top + 2 * pad);
         ctx.clip();
-        // A white mask preserves coverage and antialiasing before the chart applies its color.
         ctx.fillStyle = "#fff";
         ctx.beginPath();
         for (let i = 0; i < xs.length; i++) {
@@ -66,8 +78,7 @@ function render(message) {
         }
         ctx.fill();
         ctx.restore();
-
-        // Transfer the rendered layer instead of copying its pixel data through a message.
+        // Send the rendered layer as bitmap back to scheduler
         const bitmap = canvas.transferToImageBitmap();
         self.postMessage({
             requestId: message.requestId,
