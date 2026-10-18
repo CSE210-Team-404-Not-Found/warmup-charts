@@ -8,6 +8,9 @@
  */
 
 import { Series } from "./series.js";
+import { RenderScheduler } from "./render-scheduler.js";
+
+const WORKER_MIN_POINTS = 50000;
 
 const FONT = "13px sans-serif";
 const LABEL_FONT = "14px sans-serif";
@@ -41,6 +44,11 @@ export class Chart {
     #options;
     #observer;
     #frame = 0;
+    #renderScheduler;
+    #schedulerInitAttempted = false;
+    #stagingCanvas;
+    #stagingCanvasContext;
+    #currDrawGeneration = 0;
 
     /**
      * @param {HTMLCanvasElement} canvas  The canvas this chart draws on.
@@ -108,6 +116,7 @@ export class Chart {
 
         this.#series = [...series];
         this.#colors = [...colors];
+        this.#currDrawGeneration++;
         this.requestDraw();
     }
 
@@ -120,6 +129,7 @@ export class Chart {
         checkSize(options);
         this.#options = { ...this.#options, ...options };
         this.#applySize();
+        this.#currDrawGeneration++;
         this.requestDraw();
     }
 
@@ -153,14 +163,56 @@ export class Chart {
         const transform = this.#makeTransform(width, height, layout);
         this.#drawAxes(transform, layout);
 
-        const pad = POINT_RADIUS + 1;
-        ctx.save();
-        ctx.beginPath();
-        ctx.rect(transform.left - pad, transform.top - pad,
-            transform.right - transform.left + 2 * pad, transform.bottom - transform.top + 2 * pad);
-        ctx.clip();
-        this.#series.forEach((s, i) => this.#drawSeries(transform, s, this.#colors[i]));
-        ctx.restore();
+        const totalPoints = this.#series.reduce((sum, series) => sum + series.points.length, 0);
+        // Keep ordinary plots and line charts on the existing synchronous path.
+        const recordedGeneration = ++this.#currDrawGeneration;
+        // MAPREDUCE RENDER only if >= WORKER_MIN_POINTS and no lines, because lines are drawn in order.
+        if (!this.#options.showLine && totalPoints >= WORKER_MIN_POINTS) {
+            try {
+                if (!this.#schedulerInitAttempted) {
+                    this.#schedulerInitAttempted = true;
+                    this.#renderScheduler = RenderScheduler.create();
+                }
+                if (!this.#renderScheduler) {
+                    this.#drawSeriesOnMain(transform);
+                } else {
+                    this.#renderScheduler.setSeries(this.#series);
+                    this.#renderScheduler.render({
+                        width,
+                        height,
+                        pixelWidth: this.#canvas.width,
+                        pixelHeight: this.#canvas.height,
+                        ratio,
+                        pointRadius: POINT_RADIUS,
+                        transform,
+                    }, (bitmap, task) => {
+                        if (recordedGeneration === this.#currDrawGeneration) {
+                            this.#compositeBitmaps(
+                                bitmap, task, this.#colors[task.seriesIndex], width, height, ratio);
+                        }
+                        // A stale result is ignored above, but its bitmap still needs releasing.
+                        bitmap.close();
+                    }, () => recordedGeneration === this.#currDrawGeneration).catch((error) => {
+                        if (recordedGeneration !== this.#currDrawGeneration) {
+                            return;
+                        }
+                        console.error("Worker rendering failed; using the main thread renderer.",
+                            error);
+                        this.#renderScheduler?.destroy();
+                        this.#renderScheduler = null;
+                        this.draw();
+                    });
+                }
+            } catch (error) {
+                console.error("Worker rendering could not start; using the main thread renderer.",
+                    error);
+                this.#renderScheduler?.destroy();
+                this.#renderScheduler = null;
+                this.#drawSeriesOnMain(transform);
+            }
+        } else {
+            this.#drawSeriesOnMain(transform);
+        }
 
         if (layout.legend) {
             this.#drawLegend(layout.legend);
@@ -170,11 +222,100 @@ export class Chart {
         }
     }
 
+    #drawSeriesOnMain(transform) {
+        const ctx = this.#ctx;
+        const pad = POINT_RADIUS + 1;
+        ctx.save();
+        ctx.beginPath();
+        ctx.rect(transform.left - pad, transform.top - pad,
+            transform.right - transform.left + 2 * pad, transform.bottom - transform.top + 2 * pad);
+        ctx.clip();
+        this.#series.forEach((s, i) => this.#drawSeries(transform, s, this.#colors[i]));
+        ctx.restore();
+    }
+
+    /**
+ * Accumulates a worker-rendered series mask, colors it, and draws it onto
+ * the visible chart once all chunks for that series have arrived.
+ *
+ * The worker renders the series as a white mask on a transparent background.
+ * Chunks are combined on a separate offscreen canvas so they can be tinted
+ * together without changing the visible chart until the series is complete.
+ *
+ * @param {ImageBitmap} bitmap Rendered mask for one chunk of a series.
+ * @param {Object} task Chunk metadata, including its index and whether it is
+ *     the final chunk for the series.
+ * @param {string} color CSS color to apply to the completed mask.
+ * @param {number} width Canvas width in CSS pixels.
+ * @param {number} height Canvas height in CSS pixels.
+ * @param {number} ratio Scale from CSS pixels to backing-bitmap pixels.
+ */
+#compositeBitmaps(bitmap, task, color, width, height, ratio) {
+    // Create the offscreen canvas on demand; keep it for reuse between draws.
+    if (!this.#stagingCanvas) {
+        this.#stagingCanvas = this.#canvas.ownerDocument.createElement("canvas");
+        this.#stagingCanvasContext = this.#stagingCanvas.getContext("2d");
+        if (!this.#stagingCanvasContext) {
+            throw new Error("Could not create a chart worker-composition context.");
+        }
+    }
+
+    // Match the offscreen bitmap dimensions to the visible canvas, including
+    // its device-pixel-ratio scaling.
+    if (this.#stagingCanvas.width !== this.#canvas.width
+        || this.#stagingCanvas.height !== this.#canvas.height) {
+        this.#stagingCanvas.width = this.#canvas.width;
+        this.#stagingCanvas.height = this.#canvas.height;
+    }
+
+    const ctx = this.#stagingCanvasContext;
+
+    // Use CSS-pixel drawing coordinates while scaling them to backing pixels,
+    // just as the visible chart context does.
+    ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
+
+    if (task.chunkIndex === 0) {
+        // Start a fresh mask for this series. source-over lets later chunks
+        // accumulate on top of the earlier ones.
+        ctx.globalCompositeOperation = "source-over";
+        ctx.clearRect(0, 0, width, height);
+    }
+
+    // Add this chunk's mask to the offscreen canvas.
+    ctx.drawImage(bitmap, 0, 0, width, height);
+
+    // Wait until every chunk for this series has been accumulated before
+    // coloring or displaying it.
+    if (!task.lastChunk) {
+        return;
+    }
+
+    // console.log(`took ${(performance.now() - t0).toFixed(3)} ms`)
+
+    // Keep the color only where the accumulated mask has opacity. This turns
+    // the worker's white mask into a mask in the series' assigned color.
+    // source-in makes the fillRect only fill the masked dots, therein coloring only the dots
+    ctx.globalCompositeOperation = "source-in";
+    ctx.fillStyle = color;
+    ctx.fillRect(0, 0, width, height);
+    // Restore normal compositing
+    ctx.globalCompositeOperation = "source-over";
+
+    // copy the completed colored series ontothe visible chart.
+    this.#ctx.drawImage(this.#stagingCanvas, 0, 0, width, height);
+
+    // Clear the offscreen mask so it cannot affect the next series.
+    ctx.clearRect(0, 0, width, height);
+}
+
     /** Stop observing the canvas and cancel any pending draw. */
     destroy() {
         this.#observer.disconnect();
         cancelAnimationFrame(this.#frame);
         this.#frame = 0;
+        this.#currDrawGeneration++;
+        this.#renderScheduler?.destroy();
+        this.#renderScheduler = null;
     }
 
     /** Size the bitmap to the displayed size, accounting for devicePixelRatio. */
