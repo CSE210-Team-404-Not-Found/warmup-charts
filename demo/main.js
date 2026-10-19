@@ -53,9 +53,10 @@ async function load(name, readText) {
 
         let warning = "";
         const series = parseCSV(text, {
-            onWarning: ({ skippedRows, skippedCells }) => {
-                warning = `Loaded ${name}, skipping ${skippedRows} invalid rows `
-                    + `and ${skippedCells} invalid cells.`;
+            onWarning: ({ skippedRows, skippedCells, roundedPoints }) => {
+                warning = `Loaded ${name}, skipping ${skippedRows} invalid rows and `
+                    + `${skippedCells} invalid cells, and rounding ${roundedPoints} `
+                    + "points too large to store exactly.";
             },
         });
         chart.setSeries(series, colorsFor(series));
