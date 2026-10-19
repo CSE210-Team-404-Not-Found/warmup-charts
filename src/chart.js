@@ -243,7 +243,7 @@ export class Chart {
             this.#drawTicks(transform);
         }
         if (layout.titles) {
-            this.#drawTitles(transform);
+            this.#drawTitles(transform, layout);
         }
     }
 
@@ -287,7 +287,7 @@ export class Chart {
     }
 
     /** Axis labels. */
-    #drawTitles(transform) {
+    #drawTitles(transform, layout) {
         const ctx = this.#ctx;
         const { left, right, top, bottom } = transform;
         const { xLabel, yLabel } = this.#options;
@@ -295,7 +295,8 @@ export class Chart {
         ctx.font = LABEL_FONT;
         ctx.textAlign = "center";
         ctx.textBaseline = "middle";
-        ctx.fillText(xLabel, (left + right) / 2, bottom + X_TITLE_OFFSET, right - left);
+        const xTitleOffset = X_TITLE_OFFSET - (layout.ticks ? 0 : TICK_SPACE.bottom);
+        ctx.fillText(xLabel, (left + right) / 2, bottom + xTitleOffset, right - left);
         ctx.save();
         ctx.translate(Y_TITLE_X, (top + bottom) / 2);
         ctx.rotate(-Math.PI / 2);
