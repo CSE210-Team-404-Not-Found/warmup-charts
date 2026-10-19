@@ -62,7 +62,7 @@ test("invalid cells skip only their series and invalid x skips the row; counts r
     });
     assert.deepEqual(points(series[0]), [[0, 1], [2, 6]]);
     assert.deepEqual(points(series[1]), [[0, 2], [1, 3], [2, 7]]);
-    assert.deepEqual(warning, { skippedRows: 1, skippedCells: 1 });
+    assert.deepEqual(warning, { skippedRows: 1, skippedCells: 1, roundedPoints: 0 });
 });
 test("missing/extra columns skip entire row and never shift values into wrong series", () => {
     let warning;
@@ -72,7 +72,7 @@ test("missing/extra columns skip entire row and never shift values into wrong se
         },
     });
     assert.deepEqual(points(series[0]), [[2, 4]]);
-    assert.deepEqual(warning, { skippedRows: 2, skippedCells: 0 });
+    assert.deepEqual(warning, { skippedRows: 2, skippedCells: 0, roundedPoints: 0 });
 });
 test("nonfinite, hex and Float32-overflow coordinates never enter PointSet", () => {
     for (const value of ["NaN", "Infinity", "1e999", "1e39", "0x10", '"2"']) {
@@ -102,7 +102,7 @@ test("sample files follow the public contract and malformed sample counts skips"
             warning = value;
         },
     });
-    assert.deepEqual(warning, { skippedRows: 2, skippedCells: 2 });
+    assert.deepEqual(warning, { skippedRows: 2, skippedCells: 2, roundedPoints: 0 });
     assert.deepEqual(series.map((s) => s.points.length), [1, 4]);
 });
 test("random data returns Series[] with paired points and requested dimensions", () => {
@@ -209,4 +209,16 @@ test("sparse columns do not leak points between series", () => {
     assert.equal(b.points.length, 500);
     assert.ok(Array.from(a.points.xs).every((x) => x % 2 === 1));
     assert.ok(Array.from(b.points.xs).every((x) => x % 2 === 0));
+});
+
+test("timestamps as x are rounded by float32 storage and reported", async () => {
+    const csv = await readFile(new URL("../data/timestamps.csv", import.meta.url), "utf8");
+    let warning;
+    const [series] = parseCSV(csv, {
+        onWarning: (value) => {
+            warning = value;
+        },
+    });
+    assert.deepEqual(warning, { skippedRows: 0, skippedCells: 0, roundedPoints: 4 });
+    assert.deepEqual(Array.from(series.points.xs), Array(4).fill(Math.fround(1700000000000)));
 });
