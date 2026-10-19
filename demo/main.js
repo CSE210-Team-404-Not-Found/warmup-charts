@@ -133,3 +133,11 @@ for (const control of [chartWidth, chartHeight]) {
         }
     });
 }
+
+// Save the chart as it is currently drawn.
+document.getElementById("download-png").addEventListener("click", () => {
+    const link = document.createElement("a");
+    link.href = chart.canvas.toDataURL("image/png");
+    link.download = `${datasetName.textContent.replace(/\.csv$/i, "") || "chart"}.png`;
+    link.click();
+});
