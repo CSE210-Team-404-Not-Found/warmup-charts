@@ -4,10 +4,10 @@
 
 import test from "node:test";
 import assert from "node:assert/strict";
-import { partitionPoints } from "../src/render-scheduler.js";
+import { createChunkIndices } from "../src/render-scheduler.js";
 
 test("partitions large point sets into contiguous ranges with exact coverage", () => {
-    const chunks = partitionPoints(50001, 25000);
+    const chunks = createChunkIndices(50001, 25000);
 
     assert.equal(chunks.length, 3);
     assert.deepEqual(chunks[0], { start: 0, end: 25000 });
@@ -17,13 +17,13 @@ test("partitions large point sets into contiguous ranges with exact coverage", (
 });
 
 test("does not create empty chunks and respects the maximum size", () => {
-    assert.deepEqual(partitionPoints(0, 4), []);
-    assert.deepEqual(partitionPoints(100, 100), [{ start: 0, end: 100 }]);
-    assert.equal(partitionPoints(1_000_000, 8192).length, 123);
+    assert.deepEqual(createChunkIndices(0, 4), []);
+    assert.deepEqual(createChunkIndices(100, 100), [{ start: 0, end: 100 }]);
+    assert.equal(createChunkIndices(1_000_000, 8192).length, 123);
 });
 
 test("rejects invalid lengths and maximum chunk sizes", () => {
-    assert.throws(() => partitionPoints(-1, 2), RangeError);
-    assert.throws(() => partitionPoints(10, 0), RangeError);
-    assert.throws(() => partitionPoints(1.5, 2), RangeError);
+    assert.throws(() => createChunkIndices(-1, 2), RangeError);
+    assert.throws(() => createChunkIndices(10, 0), RangeError);
+    assert.throws(() => createChunkIndices(1.5, 2), RangeError);
 });

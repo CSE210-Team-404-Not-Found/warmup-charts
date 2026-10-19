@@ -2,7 +2,7 @@ const MAX_CHUNK_SIZE = 8192;
 const MAX_WORKERS = 32; // maximum number of workers to use, even if the system has more/less cores
 
 /**
- * Creates contiguous, non-overlapping chunk index ranges for a given pointset 
+ * Creates contiguous, non-overlapping chunk index ranges for a given pointset
  * based on it's length.
  *
  * Each range uses an inclusive `start` and exclusive `end`, and the ranges
@@ -10,7 +10,7 @@ const MAX_WORKERS = 32; // maximum number of workers to use, even if the system 
  * when `length` is zero.
  *
  * @param {number} length Number of points to partition; must be a non-negative safe integer.
- * @param {number} maxChunkSize Maximum number of points in each chunk; must be a positive safe integer.
+ * @param {number} maxChunkSize Maximum number of points in each chunk
  * @returns {{start: number, end: number}[]} Chunk ranges in ascending index order.
  * @throws {RangeError} If either argument is outside its valid range.
  */
@@ -54,7 +54,8 @@ export class RenderScheduler {
         const cores = typeof navigator === "undefined" ? 2 : navigator.hardwareConcurrency || 2;
         // if system has only one core count resolves to 0
         // and create() returns null, which is expected behavior
-        // will be handled by draw()'s try catch and fallback to synchronous single-threaded rendering
+        // will be handled by draw()'s try catch and fallback to synchronous
+        // single-threaded rendering
         const count = Math.min(MAX_WORKERS, cores - 1);
 
         this.#workers = [];
@@ -156,7 +157,8 @@ export class RenderScheduler {
             throw new Error("The rendering worker pool has been destroyed.");
         }
         // Process the tasks in batches of one per worker
-        // If the draw becomes stale, stop processing and close ny bitmaps that were already returned.
+        // If the draw becomes stale, stop processing and
+        // close any bitmaps that were already returned.
         for (let start = 0; start < this.#tasks.length; start += this.#workers.length) {
             // draw is stale
             if (!isCurrent()) {
@@ -175,7 +177,7 @@ export class RenderScheduler {
                     failure ??= result.reason;
                 }
             }
-            
+
             // draw is stale after async batch render finished
             if (!isCurrent()) {
                 for (const bitmap of bitmaps) {
@@ -219,7 +221,8 @@ export class RenderScheduler {
      * Resolves or rejects the pending render request for a worker response.
      * Closes the bitmap if the response no longer matches a pending request.
      *
-     * @param {{requestId: number, bitmap?: ImageBitmap, error?: string}} message Response sent by a rendering worker.
+     * @param {{requestId: number, bitmap?: ImageBitmap, error?: string}} message
+     * Response sent by a rendering worker.
      * @returns {void}
      */
     #onMessage(message) {

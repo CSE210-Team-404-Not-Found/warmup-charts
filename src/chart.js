@@ -172,7 +172,7 @@ export class Chart {
                     this.#schedulerInitAttempted = true;
                     this.#renderScheduler = new RenderScheduler();
                 }
-                // attempt distrubuted render 
+                // attempt distrubuted render
                 if (this.#renderScheduler) {
                     this.#renderScheduler.setSeries(this.#series);
                     this.#renderScheduler.render({
@@ -183,26 +183,31 @@ export class Chart {
                         ratio,
                         pointRadius: POINT_RADIUS,
                         transform,
-                    }, 
-                    // draw bitmap onto staging canvas if draw generation hasn't changed since the render was scheduled
+                    },
+                    // draw bitmap onto staging canvas if draw generation hasn't
+                    // changed since the render was scheduled
                     (bitmap, task) => {
                         if (recordedGeneration === this.#currDrawGeneration) {
                             this.#compositeBitmaps(
                                 bitmap, task, this.#colors[task.seriesIndex], width, height, ratio);
                         }
                         bitmap.close();
-                    }, 
-                    // callback to inform scheduler if current render is still valid 
-                    // passes only if the draw generation hasn't changed since the render was scheduled
-                    // and bitmap generation succeeds
+                    },
+                    // callback to inform scheduler if current render is still valid
+                    // passes only if the draw generation hasn't changed since
+                    // the render was scheduled and bitmap generation succeeds
                     () => recordedGeneration === this.#currDrawGeneration).catch((error) => {
                         if (recordedGeneration !== this.#currDrawGeneration) {
                             return;
                         }
-                        // callback is async and triggers during each render batch, so can occur after draw() completes
+                        // callback is async and triggers during each render batch,
+                        // so can occur after draw() completes
                         // if a worker fails, assume somethings wrong with the scheduling system
-                        // and destroy the scheduler and fall back to single-threaded rendering for all future requests
-                        console.error("Worker rendering failed; using the main thread renderer.", error);
+                        // and destroy the scheduler and fall back to single-threaded
+                        // rendering for all future requests
+                        console.error(
+                            "Worker rendering failed; using the main thread renderer.",
+                            error);
                         this.#renderScheduler?.destroy();
                         this.#renderScheduler = null;
                         this.draw();
@@ -210,7 +215,9 @@ export class Chart {
                     workerRenderScheduled = true;
                 }
             } catch (error) {
-                console.error("Worker rendering could not start; using the main thread renderer.", error);
+                console.error(
+                    "Worker rendering could not start; using the main thread renderer.",
+                    error);
                 this.#renderScheduler?.destroy();
                 this.#renderScheduler = null;
             }
@@ -231,7 +238,8 @@ export class Chart {
     /**
      * Draws all series on the main thread.
      *
-     * @param {{left: number, top: number, right: number, bottom: number}} transform Plot-area bounds in canvas coordinates.
+     * @param {{left: number, top: number, right: number, bottom: number}} transform
+     * Plot-area bounds in canvas coordinates.
      */
     #renderSingleThreaded(transform) {
         const ctx = this.#ctx;
@@ -244,11 +252,11 @@ export class Chart {
         this.#series.forEach((s, i) => this.#drawSeries(transform, s, this.#colors[i]));
         ctx.restore();
     }
-    
+
     /**
-     * Composites a worker-rendered bitmap into the staging canvas as masks. 
+     * Composites a worker-rendered bitmap into the staging canvas as masks.
      * The first chunk clears the offscreen canvas
-     * After the last chunk of a series, the mask is colored and drawn onto the main canvas. 
+     * After the last chunk of a series, the mask is colored and drawn onto the main canvas.
      *
      * @param {ImageBitmap} bitmap Rendered mask for one chunk.
      * @param {{seriesIndex: number, chunkIndex: number, lastChunk: boolean}} task
@@ -259,8 +267,7 @@ export class Chart {
      * @param {number} ratio Scale from CSS pixels to backing-bitmap pixels.
      */
     #compositeBitmaps(bitmap, task, color, width, height, ratio) {
-
-        // Create the staging canvas 
+        // Create the staging canvas
         if (!this.#stagingCanvas) {
             this.#stagingCanvas = this.#canvas.ownerDocument.createElement("canvas");
             this.#stagingCanvasContext = this.#stagingCanvas.getContext("2d");
@@ -282,12 +289,13 @@ export class Chart {
         // Add this task's bitmap to staging canvas.
         ctx.drawImage(bitmap, 0, 0, width, height);
 
-        // Wait until every bitmap in this series has been accumulated 
+        // Wait until every bitmap in this series has been accumulated
         if (!task.lastChunk) {
             return;
         }
 
-        // source-in makes the fillRect only fill/color the masked dots, therein coloring only the dots
+        // source-in makes the fillRect only fill/color the masked dots,
+        // therein coloring only the dots
         ctx.globalCompositeOperation = "source-in";
         ctx.fillStyle = color;
         ctx.fillRect(0, 0, width, height);
@@ -296,7 +304,7 @@ export class Chart {
         // copy the rendered series onto main canvas
         this.#ctx.drawImage(this.#stagingCanvas, 0, 0, width, height);
     }
-    
+
     /** Stop observing the canvas and cancel any pending draw. */
     destroy() {
         this.#observer.disconnect();
