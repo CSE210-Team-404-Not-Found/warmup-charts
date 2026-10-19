@@ -71,7 +71,7 @@ series in the same order. `setOptions(options)` merges new options into the
 current ones. The chart redraws on the next frame after either call and
 whenever its canvas is resized. `draw()` starts a redraw immediately.
 
-For large scatter plots (50,000 points or more), browsers with module workers
+For large scatter plots (18,000 points or more), browsers with module workers
 and `OffscreenCanvas` render data layers in a pool of up to 32 workers. Axes,
 labels, layout, and final composition remain on the main thread. Smaller
 datasets, line charts, and browsers without the required APIs use the regular
