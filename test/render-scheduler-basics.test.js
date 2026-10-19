@@ -31,6 +31,21 @@ test("chunks cover every point exactly once with no gaps or overlaps", () => {
     }
 });
 
+test("a chunk size of 1 gives one chunk per point", () => {
+    assert.deepEqual(createChunkIndices(5, 1), [
+        { start: 0, end: 1 },
+        { start: 1, end: 2 },
+        { start: 2, end: 3 },
+        { start: 3, end: 4 },
+        { start: 4, end: 5 },
+    ]);
+});
+
+test("every chunk is full except the last", () => {
+    const sizes = createChunkIndices(20_000, CHUNK_SIZE).map((chunk) => chunk.end - chunk.start);
+    assert.deepEqual(sizes, [8192, 8192, 3616]);
+});
+
 test("zero points give no chunks, and invalid sizes throw", () => {
     assert.deepEqual(createChunkIndices(0, CHUNK_SIZE), []);
     for (const [length, size] of [[-1, CHUNK_SIZE], [1.5, CHUNK_SIZE], [10, 0], [10, 2.5]]) {
