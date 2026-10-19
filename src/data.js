@@ -21,6 +21,12 @@ function coordinate(text) {
     return Number.isFinite(value) && Number.isFinite(Math.fround(value)) ? value : null;
 }
 
+// Float32 stores every integer below 2^24 exactly; larger values can round so
+// far that distinct inputs, such as timestamps, merge.
+function rounded(value) {
+    return Math.abs(value) >= 2 ** 24 && Math.fround(value) !== value;
+}
+
 /**
  * Parse CSV text into series.
  *
@@ -43,8 +49,9 @@ function coordinate(text) {
  *
  * @param {string} text Raw CSV file contents.
  * @param {Object} [options]
- * @param {(skipped: { skippedRows: number, skippedCells: number }) => void} [options.onWarning]
- *     Called once, after parsing, if any rows or cells were skipped.
+ * @param {(counts: { skippedRows: number, skippedCells: number, roundedPoints: number })
+ *     => void} [options.onWarning]  Called once, after parsing, if any rows or
+ *     cells were skipped or any points were rounded by Float32 storage.
  * @returns {Series[]}
  */
 export function parseCSV(text, { onWarning } = {}) {
@@ -80,7 +87,7 @@ export function parseCSV(text, { onWarning } = {}) {
     }
     // Fixed-size storage: no series can have more points than there are rows.
     const columns = names.map(() => new PointSet(lines.length - headerLine - 1));
-    const warnings = { skippedRows: 0, skippedCells: 0 };
+    const warnings = { skippedRows: 0, skippedCells: 0, roundedPoints: 0 };
     for (let i = headerLine + 1; i < lines.length; i++) {
         if (lines[i].trim() === "") {
             continue;
@@ -101,10 +108,13 @@ export function parseCSV(text, { onWarning } = {}) {
                 warnings.skippedCells++;
                 continue;
             }
+            if (rounded(x) || rounded(y)) {
+                warnings.roundedPoints++;
+            }
             columns[j].push(x, y);
         }
     }
-    if ((warnings.skippedRows || warnings.skippedCells) && onWarning) {
+    if ((warnings.skippedRows || warnings.skippedCells || warnings.roundedPoints) && onWarning) {
         onWarning(warnings);
     }
     return names.map((name, i) => new Series(name, columns[i]));

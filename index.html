@@ -24,6 +24,9 @@
                 <option value="malformed">Malformed</option>
                 <option value="multi-series">Multi-series</option>
                 <option value="single-series">Single-series</option>
+                <option value="timestamps">Timestamps</option>
+                <option value="million-rows">Million Rows</option>
+                <option value="200-cols">200 Columns</option>
             </select>
             <label for="csv-input">CSV Input</label>
             <input type="file" id="csv-input" accept=".csv,text/csv">
@@ -47,6 +50,7 @@
             <label><input type="checkbox" id="show-legend" checked> Legend</label>
             <button type="button" id="apply-changes">Apply Changes</button>
             <output id="chart-status" role="status"></output>
+            <button type="button" id="download-png">Download PNG</button>
         </section>
         <h2 id="dataset-name"></h2>
         <p id="message" role="alert" hidden></p>

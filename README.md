@@ -107,8 +107,8 @@ insufficient for large x values such as Unix timestamps.
 
 ### `parseCSV(text, { onWarning })`
 Returns one `Series` per column of the [CSV format](#csv-format) and throws if
-the header is invalid. If anything was skipped, `onWarning` is called with
-`{ skippedRows, skippedCells }`.
+the header is invalid. If anything was skipped or rounded by Float32 storage,
+`onWarning` is called with `{ skippedRows, skippedCells, roundedPoints }`.
 
 ```js
 const series = parseCSV(text, { onWarning: console.warn });
