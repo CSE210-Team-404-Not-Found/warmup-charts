@@ -101,34 +101,32 @@ input.addEventListener("change", () => {
     }
 });
 
-chartType.addEventListener("change", () => {
-    chart.setOptions({ showLine: chartType.value === "line" });
-});
-
-for (const control of [xLabel, yLabel]) {
-    control.addEventListener("input", () => {
-        chart.setOptions({ xLabel: xLabel.value, yLabel: yLabel.value });
-    });
-}
-
 const toggles = {
     showAxes: document.getElementById("show-axes"),
     showAxisLabels: document.getElementById("show-axis-labels"),
     showLegend: document.getElementById("show-legend"),
 };
-for (const [option, checkbox] of Object.entries(toggles)) {
-    checkbox.addEventListener("change", () => {
-        chart.setOptions({ [option]: checkbox.checked });
-    });
-}
+const chartStatus = document.getElementById("chart-status");
+document.getElementById("chart-options").addEventListener("input", () => {
+    chartStatus.textContent = "";
+});
 
-for (const control of [chartWidth, chartHeight]) {
-    control.addEventListener("change", () => {
-        if (chartWidth.checkValidity() && chartHeight.checkValidity()) {
-            chart.setOptions({
-                width: chartWidth.valueAsNumber,
-                height: chartHeight.valueAsNumber,
-            });
-        }
+document.getElementById("apply-changes").addEventListener("click", () => {
+    if (!chartWidth.reportValidity() || !chartHeight.reportValidity()) {
+        return;
+    }
+    chart.setOptions({
+        showLine: chartType.value === "line",
+        xLabel: xLabel.value,
+        yLabel: yLabel.value,
+        width: chartWidth.valueAsNumber,
+        height: chartHeight.valueAsNumber,
+        showAxes: toggles.showAxes.checked,
+        showAxisLabels: toggles.showAxisLabels.checked,
+        showLegend: toggles.showLegend.checked,
     });
-}
+    // setOptions schedules the chart's draw before this callback.
+    requestAnimationFrame(() => {
+        chartStatus.textContent = "Plot changes applied successfully.";
+    });
+});
