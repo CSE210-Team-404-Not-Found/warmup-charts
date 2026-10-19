@@ -169,6 +169,64 @@ export class Chart {
         }
     }
 
+    /** Find the nearest point, to be used in conjuction with a listener event to user mouse.
+    * 
+    * @param {number} x  The x coordinate of the mouse event.
+    * @param {number} y  The y coordinate of the mouse event.
+    * @param {number} threshold  The maximum distance to consider a point "near".
+    * 
+    * @returns {Object|null}  The nearest point and its series, or null if none is near.
+    */
+    findNearestPoint(x, y, threshold = 8) {
+        // width and height are the canvas's displayed size, not the bitmap size (that's just canvas.width).
+        const width = this.#canvas.clientWidth;
+        const height = this.#canvas.clientHeight;
+        if (!width || !height) {
+            console.log("Canvas has no size, cannot find nearest point.");
+            return null;
+        }
+
+        // Layout and transform are needed to convert between data coordinates and pixel coordinates.
+        const layout = this.#layout(width, height);
+        const transform = this.#makeTransform(width, height, layout);
+
+        let nearest = null;
+
+        // Iterate through each series and each point in the series to find the nearest point to the given (x, y) coordinates.
+        // Is this time efficient... most certainly not -> check lag with large data sets
+        for (let i = 0; i < this.#series.length; i++) {
+            const series = this.#series[i];
+            const { xs, ys, length } = series.points;
+
+            // For each point, calculate its pixel coordinates and the distance to the given (x, y) coordinates.
+            for (let j = 0; j < length; j++) {
+                const px = transform.toPx(xs[j]);
+                const py = transform.toPy(ys[j]);
+
+                const dx = x - px;
+                const dy = y - py;
+                const dist = Math.hypot(dx, dy);
+
+                // If the distance is within the threshold and is the nearest point found so far, update the nearest point information.
+                if (dist <= threshold && (nearest === null || dist < nearest.dist)) {
+                    nearest = {
+                        series,
+                        seriesIndex: i,
+                        index: j,
+                        x: xs[j],
+                        y: ys[j],
+                        px,
+                        py,
+                        distance: dist,
+                    };
+                }
+            }
+        }
+
+        return nearest;
+
+    }
+
     /** Stop observing the canvas and cancel any pending draw. */
     destroy() {
         this.#observer.disconnect();

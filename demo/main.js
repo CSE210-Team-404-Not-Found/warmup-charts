@@ -17,8 +17,11 @@ const chartWidth = document.getElementById("chart-width");
 const chartHeight = document.getElementById("chart-height");
 const datasetName = document.getElementById("dataset-name");
 const message = document.getElementById("message");
+const canvas = document.getElementById("chart");
+const tooltip = document.getElementById("tooltip");
 
-const chart = new Chart(document.getElementById("chart"), {
+// The Chart wraps the canvas element and does the drawing and hit-testing.
+const chart = new Chart(canvas, {
     width: chartWidth.valueAsNumber,
     height: chartHeight.valueAsNumber,
     showLine: chartType.value === "line",
@@ -138,4 +141,27 @@ document.getElementById("download-png").addEventListener("click", () => {
     link.href = chart.canvas.toDataURL("image/png");
     link.download = `${datasetName.textContent.replace(/\.csv$/i, "") || "chart"}.png`;
     link.click();
+});
+
+// Show the nearest point's series and value while hovering the chart.
+canvas.addEventListener("pointermove", (event) => {
+    const rect = canvas.getBoundingClientRect();
+    const x = event.clientX - rect.left;
+    const y = event.clientY - rect.top;
+
+    // Hit-test on the Chart, which knows the data-to-pixel transform; the canvas does not.
+    const hit = chart.findNearestPoint(x, y, 7);
+    if (!hit) {
+        tooltip.hidden = true;
+        return;
+    }
+
+    tooltip.hidden = false;
+    tooltip.textContent = `${hit.series.name}: (${hit.x}, ${hit.y})`;
+    tooltip.style.left = `${event.clientX + 10}px`;
+    tooltip.style.top = `${event.clientY + 10}px`;
+});
+
+canvas.addEventListener("pointerleave", () => {
+    tooltip.hidden = true;
 });
