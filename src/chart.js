@@ -10,7 +10,7 @@
 import { Series } from "./series.js";
 import { RenderScheduler } from "./render-scheduler.js";
 
-const WORKER_MIN_POINTS = 50000;
+const WORKER_MIN_POINTS = 18000;
 
 const FONT = "13px sans-serif";
 const LABEL_FONT = "14px sans-serif";
