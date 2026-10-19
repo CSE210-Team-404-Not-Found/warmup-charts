@@ -3,59 +3,71 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Warmup Charts | team seven eleven</title>
+    <title>Warmup Charts</title>
     <link rel="stylesheet" href="style.css">
     <script src="demo/theme.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Nunito:ital,wght@0,200..1000;1,200..1000&family=Quicksand:wght@300..700&display=swap" rel="stylesheet">
 </head>
 <body>
     <header>
         <hgroup>
-            <h1>Warmup Charts</h1>
-            <p>by team seven eleven</p>
+            <div class="row">
+                <img src="images/website_icon.png" alt="Warmup Charts logo" width="32" height="32">
+                <h1>Warmup Charts</h1>
+            </div>
+            <p>created by team seven eleven, development continued by team 404 not found</p>
         </hgroup>
         <button type="button" id="theme-toggle" aria-pressed="false">7-11 theme</button>
     </header>
     <main>
-        <section id="input-data">
-            <label for="test-sets">Dataset</label>
-            <select id="test-sets" name="test-sets">
-                <option value="random">Random</option>
-                <option value="empty">Empty</option>
-                <option value="malformed">Malformed</option>
-                <option value="multi-series">Multi-series</option>
-                <option value="single-series">Single-series</option>
-                <option value="large-series">Large-series</option>
-                <option value="negative-series">Negative-series</option>
-                <option value="decimal-series">Decimal-series</option>
-                <option value="simple-series">Simple-series</option>
-            </select>
-            <label for="csv-input">CSV Input</label>
-            <input type="file" id="csv-input" accept=".csv,text/csv">
+        <section id="left-panel">
+            <section id="input-data" class="controls">
+                <h3>Input Data</h3>
+                <label for="test-sets">Dataset</label>
+                <select id="test-sets" name="test-sets">
+                    <option value="random">Random</option>
+                    <option value="empty">Empty</option>
+                    <option value="malformed">Malformed</option>
+                    <option value="multi-series">Multi-series</option>
+                    <option value="single-series">Single-series</option>
+                    <option value="large-series">Large-series</option>
+                    <option value="negative-series">Negative-series</option>
+                    <option value="decimal-series">Decimal-series</option>
+                    <option value="simple-series">Simple-series</option>
+                </select>
+                <label for="csv-input">CSV Input</label>
+                <input type="file" id="csv-input" accept=".csv,text/csv">
+            </section>
+            <section id="chart-options" class="controls">
+                <h3>Chart Options</h3>
+                <label for="chart-type">Chart Type</label>
+                <select id="chart-type" name="chart-type">
+                    <option value="scatter">Scatter Plot</option>
+                    <option value="line">Line Graph</option>
+                </select>
+                <label for="chart-width">Width (px)</label>
+                <input type="number" id="chart-width" min="1" value="800">
+                <label for="chart-height">Height (px)</label>
+                <input type="number" id="chart-height" min="1" value="450">
+                <label for="x-axis">X axis label</label>
+                <input type="text" id="x-axis" value="x">
+                <label for="y-axis">Y axis label</label>
+                <input type="text" id="y-axis" value="y">
+                <label><input type="checkbox" id="show-axes" checked> Axes</label>
+                <label><input type="checkbox" id="show-axis-labels" checked> Axis labels</label>
+                <label><input type="checkbox" id="show-legend" checked> Legend</label>
+            </section>
         </section>
-        <section id="chart-options">
-            <label for="chart-type">Chart Type</label>
-            <select id="chart-type" name="chart-type">
-                <option value="scatter">Scatter Plot</option>
-                <option value="line">Line Graph</option>
-            </select>
-            <label for="x-axis">X axis label</label>
-            <input type="text" id="x-axis" value="x">
-            <label for="y-axis">Y axis label</label>
-            <input type="text" id="y-axis" value="y">
-            <label for="chart-width">Width (px)</label>
-            <input type="number" id="chart-width" min="1" value="800">
-            <label for="chart-height">Height (px)</label>
-            <input type="number" id="chart-height" min="1" value="450">
-            <label><input type="checkbox" id="show-axes" checked> Axes</label>
-            <label><input type="checkbox" id="show-axis-labels" checked> Axis labels</label>
-            <label><input type="checkbox" id="show-legend" checked> Legend</label>
+        <section id="right-panel">
+            <h2 id="dataset-name"></h2>
+            <p id="message" role="alert" hidden></p>
+            <div id="tooltip" hidden></div>
+            <div id="chart-scroll">
+                <canvas id="chart"></canvas>
+            </div>
         </section>
-        <h2 id="dataset-name"></h2>
-        <p id="message" role="alert" hidden></p>
-        <div id="tooltip" hidden></div>
-        <div id="chart-scroll">
-            <canvas id="chart"></canvas>
-        </div>
     </main>
     <script type="module" src="demo/main.js"></script>
 </body>

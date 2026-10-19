@@ -144,7 +144,7 @@ canvas.addEventListener("pointermove", (event) => {
     const y = event.clientY - rect.top;
 
     // Use findNearestPoint on chart NOT canvas or rect bc canvas is just the HTML element, chart is the object that wraps it and provides charting functionality.
-    const hit = chart.findNearestPoint(x, y, 8);
+    const hit = chart.findNearestPoint(x, y, 7);
     if (!hit) {
         tooltip.hidden = true;
         return;
