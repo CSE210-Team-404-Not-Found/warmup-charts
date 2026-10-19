@@ -92,6 +92,16 @@ select, input, button {
     margin: 0;
 }
 
+#apply-changes {
+    justify-self: start;
+}
+
+#chart-status {
+    min-height: 1lh;
+    color: #006b4f;
+    font-weight: 600;
+}
+
 #message {
     margin: 0;
     padding: 8px 12px;
