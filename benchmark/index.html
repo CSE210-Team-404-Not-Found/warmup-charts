@@ -6,6 +6,34 @@
     <title>Benchmark | Warmup Charts</title>
     <link rel="stylesheet" href="../style.css">
     <style>
+        /* The demo page's two-panel layout doesn't fit this page; keep a two-column grid. */
+        main {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 2vmin;
+            max-width: 1000px;
+            margin: 3vmin auto;
+            padding: 0 3vmin;
+        }
+
+        /* Everything after the two control sections spans both columns. */
+        main > :not(section) {
+            grid-column: 1 / -1;
+        }
+
+        header {
+            padding: 2vmin;
+        }
+
+        hgroup h1 {
+            margin: 0;
+        }
+
+        hgroup p {
+            margin: 0;
+            font-size: 1rem;
+        }
+
         .chart-scroll {
             overflow-x: auto;
         }

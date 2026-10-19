@@ -82,6 +82,7 @@ hgroup p {
 }
 
 button {
+    font: inherit;
     border-radius: 10px;
     border-color: var(--subtitle-color);
     margin-right: 1vw;
