@@ -19,7 +19,6 @@ const EDGE = 4;
 const TICK_SPACE = { left: 40, bottom: 24, right: 24, top: 16 };
 const TITLE_SPACE = { left: 20, bottom: 36 };
 const TICK_LABEL_GAP = 10;
-const X_TITLE_OFFSET = 46;
 const Y_TITLE_X = 18;
 const LEGEND_INSET = 24;
 const LEGEND_GAP = 20;
@@ -295,8 +294,8 @@ export class Chart {
         ctx.font = LABEL_FONT;
         ctx.textAlign = "center";
         ctx.textBaseline = "middle";
-        const xTitleOffset = X_TITLE_OFFSET - (layout.ticks ? 0 : TICK_SPACE.bottom);
-        ctx.fillText(xLabel, (left + right) / 2, bottom + xTitleOffset, right - left);
+        const xTitleY = this.#canvas.clientHeight - layout.edge - TITLE_SPACE.bottom / 2;
+        ctx.fillText(xLabel, (left + right) / 2, xTitleY, right - left);
         ctx.save();
         ctx.translate(Y_TITLE_X, (top + bottom) / 2);
         ctx.rotate(-Math.PI / 2);
