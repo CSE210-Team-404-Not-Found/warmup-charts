@@ -44,9 +44,10 @@ and it does not set `CIRCLE_REPOSITORY_URL`. So the deploy job takes the
 repository's owner and name from pipeline values, and pushes with a deploy
 key that needs a one-time setup:
 
-1. A GitHub organization admin creates the project in CircleCI through the
-   GitHub App and gives it access to this repository. The default trigger
-   runs the pipeline on every push.
+1. A GitHub organization admin connects the CircleCI GitHub App to the
+   team's CircleCI organization (Organization Settings > VCS Connections)
+   with access to this repository, and gives the project a GitHub App
+   pipeline whose trigger runs it on every push.
 2. Generate an SSH key pair. Add the public key to the repository's deploy
    keys with write access, and the private key to the CircleCI project's
    additional SSH keys for `github.com`.
