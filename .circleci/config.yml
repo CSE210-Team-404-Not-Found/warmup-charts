@@ -1,0 +1,52 @@
+# Checks on every push, SonarQube Cloud analysis of main and pull requests, and
+# the GitHub Pages deploy of main. See ADR-0013 and ADR-0014.
+
+version: 2.1
+
+orbs:
+  sonarcloud: sonarsource/sonarcloud@4.0
+
+executors:
+  node:
+    docker:
+      - image: cimg/node:22.23
+
+jobs:
+  check:
+    executor: node
+    steps:
+      - checkout
+      - run: npm ci
+      - run: npm run lint
+      - run: npm test
+
+  analyze:
+    executor: node
+    steps:
+      - checkout
+      - run: .circleci/scripts/halt-unless-main-or-pull-request.sh
+      - run: npm ci
+      - run: npm run coverage
+      - sonarcloud/scan
+
+  deploy:
+    executor: node
+    environment:
+      REPOSITORY: << pipeline.git.repo_owner >>/<< pipeline.git.repo_name >>
+    steps:
+      - checkout
+      - add_ssh_keys
+      - run: .circleci/scripts/stage-site.sh _site
+      - run: .circleci/scripts/publish-branch.sh _site gh-pages
+
+workflows:
+  check-and-deploy:
+    jobs:
+      - check
+      - analyze:
+          context: SonarCloud
+      - deploy:
+          requires: [check]
+          filters:
+            branches:
+              only: main
