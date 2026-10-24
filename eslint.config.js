@@ -3,7 +3,8 @@ import stylistic from "@stylistic/eslint-plugin";
 import globals from "globals";
 
 export default [
-    { ignores: ["node_modules/", "_site/"] },
+    // MERGETODO: Remove once prototypes/ is resolved
+    { ignores: ["node_modules/", "_site/", "prototypes/"] },
 
     js.configs.recommended,
     stylistic.configs.customize({
@@ -15,7 +16,7 @@ export default [
     }),
 
     {
-        files: ["src/**/*.js", "demo/**/*.js"],
+        files: ["src/**/*.js", "demo/**/*.js", "benchmark/**/*.js"],
         languageOptions: { globals: globals.browser },
     },
     {

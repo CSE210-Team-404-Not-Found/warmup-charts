@@ -1,0 +1,69 @@
+---
+status: accepted
+date: 2026-10-16
+decision-makers: Team members present at 10/16 meeting (Anna, Jason, Loisel, Max, Mia, Sukruth)
+---
+
+# ADR-0012: Parallel data rendering, MapReduce
+
+## Context and Problem Statement
+
+Current rendering implementation struggles to load large datasets efficiently. 
+CSVs with 500k-1M data points take X amount of time to load, which is above
+our maximum load time goal of 1 second.
+
+## Decision Drivers
+
+* Reduce rendering time for large datasets, with a target of  completing a draw within one second.
+* Keep the main thread responsive while large datasets are rendered.
+* Preserve existing chart features and deterministic series draw order.
+
+## Considered Options
+
+* Switching to WebGL
+* MapReduce on canvas rendering
+
+## Decision Outcome
+
+Chosen option: **MapReduce on canvas rendering**, to avoid rewriting entire rendering engine 
+
+```mermaid
+flowchart LR
+  A[Series point data] --> B[Partition by series or point chunks]
+  B --> C1[Worker 1: transform and render]
+  B --> C2[Worker 2: transform and render]
+  B --> Cn[Worker N: transform and render]
+  C1 --> D[Worker-owned canvas layers]
+  C2 --> D
+  Cn --> D
+  E[Main thread: background and axes] --> F[Composite layers in draw order]
+  D --> F
+  F --> G[Main thread: legend and labels]
+  G --> H[Displayed chart]
+```
+
+### Consequences
+
+* Bad: performance gains are not guaranteed; worker scheduling, data transfer,
+  and combining results can outweigh parallel work.
+## Pros and Cons of the Options
+
+### Switching to WebGL
+
+* Good: utilizes GPU speedup for graph rendering
+* Good: supports fluid zooming and panning
+* Bad: high learning curve, no one on the team has relavent experience
+* Bad: requires rewrite of large potion of existing codebase
+
+### MapReduce on canvas rendering
+
+* Good: independent series or point chunks can have their coordinates
+  prepared in parallel while retaining the Canvas 2D rendering approach.
+* Good: moving CPU-heavy preparation off the main thread can keep the page
+  responsive while large datasets are processed.
+* Bad: workers cannot draw into the chart's existing Canvas 2D context. Using
+  worker-owned canvases or `OffscreenCanvas` requires a composition step and
+  care to preserve clipping and draw order.
+* Bad: sending point data to workers and coordinating their results adds
+  memory and messaging overhead, which may outweigh the gains for smaller
+  datasets.

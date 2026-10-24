@@ -16,18 +16,25 @@ function points(series) {
     return Array.from(series.points.xs, (x, i) => [x, series.points.ys[i]]);
 }
 
-test("public API returns Series and PointSet, sorted with coordinate pairs intact", () => {
+function sorted(series) {
+    series.points.sort();
+    return points(series);
+}
+
+test("public API returns Series and PointSet in row order, sorting with pairs intact", () => {
     const [series] = parseCSV("x,Distance\n2,4\n0,1\n1,3");
     assert.ok(series instanceof Series);
     assert.ok(series.points instanceof PointSet);
     assert.equal(series.name, "Distance");
-    assert.deepEqual(points(series), [[0, 1], [1, 3], [2, 4]]);
+    assert.equal(series.points.sorted, false);
+    assert.deepEqual(points(series), [[2, 4], [0, 1], [1, 3]]);
+    assert.deepEqual(sorted(series), [[0, 1], [1, 3], [2, 4]]);
 });
 test("wide CSV groups columns, preserves header order, and supports gaps", () => {
     const series = parseCSV("x,Trial B,Trial A\n2,4,3\n0,,1\n1,2,");
     assert.deepEqual(series.map((s) => s.name), ["Trial B", "Trial A"]);
-    assert.deepEqual(points(series[0]), [[1, 2], [2, 4]]);
-    assert.deepEqual(points(series[1]), [[0, 1], [2, 3]]);
+    assert.deepEqual(sorted(series[0]), [[1, 2], [2, 4]]);
+    assert.deepEqual(sorted(series[1]), [[0, 1], [2, 3]]);
 });
 test("BOM, CRLF, whitespace, blank lines and scientific notation", () => {
     const [s] = parseCSV("\uFEFF time , value \r\n\r\n -1.5 , 2e1 \r\n");
@@ -55,7 +62,7 @@ test("invalid cells skip only their series and invalid x skips the row; counts r
     });
     assert.deepEqual(points(series[0]), [[0, 1], [2, 6]]);
     assert.deepEqual(points(series[1]), [[0, 2], [1, 3], [2, 7]]);
-    assert.deepEqual(warning, { skippedRows: 1, skippedCells: 1 });
+    assert.deepEqual(warning, { skippedRows: 1, skippedCells: 1, roundedPoints: 0 });
 });
 test("missing/extra columns skip entire row and never shift values into wrong series", () => {
     let warning;
@@ -65,7 +72,7 @@ test("missing/extra columns skip entire row and never shift values into wrong se
         },
     });
     assert.deepEqual(points(series[0]), [[2, 4]]);
-    assert.deepEqual(warning, { skippedRows: 2, skippedCells: 0 });
+    assert.deepEqual(warning, { skippedRows: 2, skippedCells: 0, roundedPoints: 0 });
 });
 test("nonfinite, hex and Float32-overflow coordinates never enter PointSet", () => {
     for (const value of ["NaN", "Infinity", "1e999", "1e39", "0x10", '"2"']) {
@@ -73,8 +80,8 @@ test("nonfinite, hex and Float32-overflow coordinates never enter PointSet", () 
         assert.equal(parseCSV(`x,y\n${value},2`)[0].points.length, 0);
     }
 });
-test("equal x coordinates retain stable order", () => {
-    assert.deepEqual(points(parseCSV("x,y\n2,9\n1,3\n1,4")[0]), [[1, 3], [1, 4], [2, 9]]);
+test("equal x coordinates sort by y", () => {
+    assert.deepEqual(sorted(parseCSV("x,y\n2,9\n1,4\n1,3")[0]), [[1, 3], [1, 4], [2, 9]]);
 });
 test("valid CSV does not warn; warning callback validated", () => {
     parseCSV("x,y\n0,1", { onWarning: () => assert.fail("Unexpected warning") });
@@ -95,16 +102,16 @@ test("sample files follow the public contract and malformed sample counts skips"
             warning = value;
         },
     });
-    assert.deepEqual(warning, { skippedRows: 2, skippedCells: 2 });
+    assert.deepEqual(warning, { skippedRows: 2, skippedCells: 2, roundedPoints: 0 });
     assert.deepEqual(series.map((s) => s.points.length), [1, 4]);
 });
-test("random data returns Series[] with sorted paired points and requested dimensions", () => {
+test("random data returns Series[] with paired points and requested dimensions", () => {
     const values = [0.75, 0.25, 0.25, 0.75];
     let index = 0;
     const [series] = randomData({ pointCount: 2, xMin: -2, xMax: 2,
         yMin: 10, yMax: 20, random: () => values[index++] });
     assert.ok(series instanceof Series);
-    assert.deepEqual(points(series), [[-1, 17.5], [1, 12.5]]);
+    assert.deepEqual(points(series), [[1, 12.5], [-1, 17.5]]);
     const data = randomData({ seriesCount: 2, pointCount: 3, random: () => 0.5 });
     assert.deepEqual(data.map((s) => s.name), ["Series 1", "Series 2"]);
     assert.deepEqual(data.map((s) => s.points.length), [3, 3]);
@@ -113,11 +120,11 @@ test("random data returns Series[] with sorted paired points and requested dimen
     assert.equal(randomData({ pointCount: 0 })[0].points.length, 0);
     assert.equal(randomData()[0].points.length, 10);
 });
-test("large random data stays finite, sorted and within default bounds", () => {
+test("large random data stays finite, sorts, and stays within default bounds", () => {
     const [series] = randomData({ pointCount: 10000 });
     assert.equal(series.points.length, 10000);
     let previous = -Infinity;
-    for (const [x, y] of points(series)) {
+    for (const [x, y] of sorted(series)) {
         assert.ok(x >= previous && x >= 0 && x <= 10);
         assert.ok(y >= 0 && y <= 10);
         previous = x;
@@ -167,11 +174,11 @@ test("old Mac (CR-only) line endings", () => {
 
 test("duplicate x values are all kept", () => {
     const [a, b] = parseCSV("x,A,B\n1,1,5\n1,2,\n0,3,6");
-    assert.deepEqual(points(a), [[0, 3], [1, 1], [1, 2]]);
-    assert.deepEqual(points(b), [[0, 6], [1, 5]]);
+    assert.deepEqual(sorted(a), [[0, 3], [1, 1], [1, 2]]);
+    assert.deepEqual(sorted(b), [[0, 6], [1, 5]]);
 });
 
-test("large unsorted input is sorted with every x/y pair intact", () => {
+test("large unsorted input sorts with every x/y pair intact", () => {
     const n = 100000;
     const rows = ["x,Double,Negative"];
     // Deterministic shuffle of 0..n-1
@@ -180,6 +187,8 @@ test("large unsorted input is sorted with every x/y pair intact", () => {
         rows.push(`${x},${x * 2},${-x}`);
     }
     const [double, negative] = parseCSV(rows.join("\n"));
+    double.points.sort();
+    negative.points.sort();
     assert.equal(double.points.length, n);
     assert.equal(negative.points.length, n);
     const { xs, ys } = double.points;
@@ -200,4 +209,16 @@ test("sparse columns do not leak points between series", () => {
     assert.equal(b.points.length, 500);
     assert.ok(Array.from(a.points.xs).every((x) => x % 2 === 1));
     assert.ok(Array.from(b.points.xs).every((x) => x % 2 === 0));
+});
+
+test("timestamps as x are rounded by float32 storage and reported", async () => {
+    const csv = await readFile(new URL("../data/timestamps.csv", import.meta.url), "utf8");
+    let warning;
+    const [series] = parseCSV(csv, {
+        onWarning: (value) => {
+            warning = value;
+        },
+    });
+    assert.deepEqual(warning, { skippedRows: 0, skippedCells: 0, roundedPoints: 4 });
+    assert.deepEqual(Array.from(series.points.xs), Array(4).fill(Math.fround(1700000000000)));
 });

@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="icon" href="data:,">
+    <link rel="stylesheet" href="../styles.css">
+    <title>Independent library example · Graph Plotter</title>
+  </head>
+  <body>
+    <main>
+      <p><a href="../index.html">Back to Graph Plotter</a></p>
+      <h1>Independent library example</h1>
+      <p>This page reads a separate <a href="./data/calibration.csv" download>calibration CSV</a> and calls the plotting library directly. It does not use the demo controls or demo data.</p>
+      <p>Synthetic sensor calibration: input voltage (V) and output current (mA), within the fixed 0–5 ranges.</p>
+      <h2>Scatter plot</h2>
+      <canvas id="scatter" width="960" height="500" role="img" aria-label="Scatter plot of two synthetic calibration series" aria-describedby="example-data"></canvas>
+      <h2>Line chart</h2>
+      <canvas id="line" width="960" height="500" role="img" aria-label="Line chart of the same synthetic calibration series" aria-describedby="example-data"></canvas>
+      <p id="example-status" role="status"></p>
+      <details id="example-data">
+        <summary>View data and the library call</summary>
+        <pre id="source-example"></pre>
+      </details>
+      <noscript>Enable JavaScript to draw the charts.</noscript>
+    </main>
+    <script type="module" src="./reuse.js"></script>
+  </body>
+</html>

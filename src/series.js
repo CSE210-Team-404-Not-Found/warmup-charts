@@ -12,7 +12,7 @@ import { PointSet } from "./point-set.js";
 export class Series {
     /**
      * @param {string} name     Label for the legend.
-     * @param {PointSet} points Points sorted by x.
+     * @param {PointSet} points
      */
     constructor(name, points) {
         if (typeof name !== "string") {

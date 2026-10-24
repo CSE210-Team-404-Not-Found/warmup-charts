@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Benchmark | Warmup Charts</title>
+    <link rel="stylesheet" href="../style.css">
+    <style>
+        /* The demo page's two-panel layout doesn't fit this page; keep a two-column grid. */
+        main {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 2vmin;
+            max-width: 1000px;
+            margin: 3vmin auto;
+            padding: 0 3vmin;
+        }
+
+        /* Everything after the two control sections spans both columns. */
+        main > :not(section) {
+            grid-column: 1 / -1;
+        }
+
+        header {
+            padding: 2vmin;
+        }
+
+        hgroup h1 {
+            margin: 0;
+        }
+
+        hgroup p {
+            margin: 0;
+            font-size: 1rem;
+        }
+
+        .chart-scroll {
+            overflow-x: auto;
+        }
+
+        canvas {
+            display: block;
+            border: var(--chart-border);
+            box-sizing: border-box;
+            background-color: var(--surface-bg);
+        }
+
+        .buttons {
+            display: flex;
+            gap: 1vmin;
+            margin-top: 1vmin;
+        }
+
+        #setup,
+        #status {
+            margin: 0;
+        }
+
+        table {
+            border-collapse: collapse;
+            font-variant-numeric: tabular-nums;
+        }
+
+        th,
+        td {
+            padding: 4px 10px;
+            border-bottom: 1px solid #dddddd;
+            text-align: right;
+        }
+
+        /* Totals slower than the 1 second goal. */
+        .over-target {
+            color: var(--error-color);
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <hgroup>
+            <h1>Warmup Charts Benchmark</h1>
+            <p>How load time grows with the size of the CSV</p>
+        </hgroup>
+    </header>
+    <main>
+        <section>
+            <label for="max-rows">Largest file (rows)</label>
+            <input type="number" id="max-rows" min="0" step="1" value="500000">
+            <label for="step">Step (rows)</label>
+            <input type="number" id="step" min="1" step="1" value="5000">
+            <label for="series-counts">Series counts (comma-separated)</label>
+            <input type="text" id="series-counts" value="1, 2">
+        </section>
+        <section>
+            <label for="runs">Runs per size</label>
+            <input type="number" id="runs" min="1" step="1" value="5">
+            <label for="run-label">Label (e.g. current or map-reduce)</label>
+            <input type="text" id="run-label" placeholder="current">
+            <label for="chart-types">Chart type</label>
+            <select id="chart-types">
+                <option value="both">Scatter and line</option>
+                <option value="scatter">Scatter only</option>
+                <option value="line">Line only</option>
+            </select>
+            <div class="buttons">
+                <button type="button" id="start">Start</button>
+                <button type="button" id="stop" disabled>Stop</button>
+                <button type="button" id="download" disabled>Download CSV</button>
+            </div>
+        </section>
+        <p id="setup"></p>
+        <p id="status">Keep this tab open and in front while the benchmark runs.</p>
+        <h2>Chart being measured</h2>
+        <div class="chart-scroll">
+            <canvas id="test-chart"></canvas>
+        </div>
+        <div id="results-section" hidden>
+            <h2>Results</h2>
+            <div class="chart-scroll">
+                <canvas id="results-chart"></canvas>
+            </div>
+            <div class="chart-scroll">
+                <table id="results">
+                    <thead>
+                        <tr>
+                            <th>Rows</th>
+                            <th>Series</th>
+                            <th>Points</th>
+                            <th>File (MB)</th>
+                            <th>Chart</th>
+                            <th>Read (ms)</th>
+                            <th>Parse (ms)</th>
+                            <th>Draw (ms)</th>
+                            <th>Paint (ms)</th>
+                            <th>Total (ms)</th>
+                        </tr>
+                    </thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+        </div>
+    </main>
+    <script type="module" src="benchmark.js"></script>
+</body>
+</html>

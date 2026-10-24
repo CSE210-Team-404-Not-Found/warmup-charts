@@ -8,6 +8,32 @@
  */
 
 import { Series } from "./series.js";
+import { RenderScheduler } from "./render-scheduler.js";
+
+const WORKER_MIN_POINTS = 18000;
+
+const FONT = "13px sans-serif";
+const LABEL_FONT = "14px sans-serif";
+const TEXT_COLOR = "#222";
+const AXIS_COLOR = "#666";
+const BACKGROUND = "#fff";
+
+const EDGE = 4;
+const TICK_SPACE = { left: 40, bottom: 24, right: 24, top: 16 };
+const TITLE_SPACE = { left: 20, bottom: 36 };
+const TICK_LABEL_GAP = 10;
+const Y_TITLE_X = 18;
+const LEGEND_INSET = 24;
+const LEGEND_GAP = 20;
+
+const TITLES_MIN = { width: 240, height: 200 };
+const LEGEND_MIN = { width: 160, height: 120 };
+const TICKS_MIN = { width: 120, height: 100 };
+const LEGEND_ROW = 24;
+const LEGEND_SWATCH = 10;
+const POINT_RADIUS = 4;
+const TICK_COUNT = 5;
+const TICK_GAP = { x: 50, y: 30 };
 
 export class Chart {
     #canvas;
@@ -17,22 +43,42 @@ export class Chart {
     #options;
     #observer;
     #frame = 0;
+    #renderScheduler;
+    #schedulerInitAttempted = false;
+    #stagingCanvas;
+    #stagingCanvasContext;
+    #currDrawGeneration = 0;
 
     /**
      * @param {HTMLCanvasElement} canvas  The canvas this chart draws on.
      * @param {Object} [options]
+     * @param {number} [options.width]  Width in CSS pixels (default 800).
+     * @param {number} [options.height]  Height in CSS pixels (default 450).
      * @param {boolean} [options.showLine]  Connect points with lines.
-     * @param {[number, number]} [options.xRange]  Fixed x axis start and end.
-     * @param {[number, number]} [options.yRange]  Fixed y axis start and end.
+     * @param {boolean} [options.showAxes]  Axis lines and ticks (default true).
+     * @param {boolean} [options.showAxisLabels]  Axis labels (default true).
+     * @param {boolean} [options.showLegend]  Legend (default true).
+     * @param {[number, number]} [options.xRange]  Fixed x axis start and end
+     *     (default: fit the data).
+     * @param {[number, number]} [options.yRange]  Fixed y axis start and end
+     *     (default: fit the data).
+     * @param {string} [options.xLabel]  x axis label.
+     * @param {string} [options.yLabel]  y axis label.
      */
     constructor(canvas, options = {}) {
         if (!(canvas instanceof HTMLCanvasElement)) {
             throw new TypeError("Chart needs a <canvas> element");
         }
 
+        checkSize(options);
         this.#canvas = canvas;
         this.#ctx = canvas.getContext("2d");
-        this.#options = { showLine: false, xRange: null, yRange: null, ...options };
+        this.#options = {
+            width: 800, height: 450, showLine: false,
+            showAxes: true, showAxisLabels: true, showLegend: true,
+            xRange: null, yRange: null, xLabel: "", yLabel: "", ...options,
+        };
+        this.#applySize();
 
         // Fires once immediately, which gives the first draw.
         this.#observer = new ResizeObserver(() => this.#resize());
@@ -69,6 +115,7 @@ export class Chart {
 
         this.#series = [...series];
         this.#colors = [...colors];
+        this.#currDrawGeneration++;
         this.requestDraw();
     }
 
@@ -78,7 +125,10 @@ export class Chart {
 
     /** Merge new options in and redraw. */
     setOptions(options) {
+        checkSize(options);
         this.#options = { ...this.#options, ...options };
+        this.#applySize();
+        this.#currDrawGeneration++;
         this.requestDraw();
     }
 
@@ -96,12 +146,207 @@ export class Chart {
     /** Redraw everything now from the chart's stored state. */
     draw() {
         const ctx = this.#ctx;
-        const transform = this.#makeTransform();
+        const width = this.#canvas.clientWidth;
+        const height = this.#canvas.clientHeight;
+        if (!width || !height) {
+            return;
+        }
 
-        ctx.clearRect(0, 0, this.#canvas.width, this.#canvas.height);
-        this.#drawAxes(transform);
+        const ratio = this.#canvas.width / width;
+        ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
+        ctx.clearRect(0, 0, width, height);
+        ctx.fillStyle = BACKGROUND;
+        ctx.fillRect(0, 0, width, height);
+
+        const layout = this.#layout(width, height);
+        const transform = this.#makeTransform(width, height, layout);
+
+        const totalPoints = this.#series.reduce((sum, series) => sum + series.points.length, 0);
+        const recordedGeneration = ++this.#currDrawGeneration;
+        let workerRenderScheduled = false;
+        if (!this.#options.showLine && totalPoints >= WORKER_MIN_POINTS) {
+            try {
+                // create render scheduler if it hasn't been created yet
+                if (!this.#schedulerInitAttempted) {
+                    this.#schedulerInitAttempted = true;
+                    this.#renderScheduler = new RenderScheduler();
+                }
+                // attempt distrubuted render
+                if (this.#renderScheduler) {
+                    this.#renderScheduler.setSeries(this.#series);
+                    this.#renderScheduler.render({
+                        width,
+                        height,
+                        pixelWidth: this.#canvas.width,
+                        pixelHeight: this.#canvas.height,
+                        ratio,
+                        pointRadius: POINT_RADIUS,
+                        transform,
+                    },
+                    // draw bitmap onto staging canvas if draw generation hasn't
+                    // changed since the render was scheduled
+                    (bitmap, task) => {
+                        if (recordedGeneration === this.#currDrawGeneration) {
+                            this.#compositeBitmaps(
+                                bitmap, task, this.#colors[task.seriesIndex], width, height, ratio);
+                        }
+                        bitmap.close();
+                    },
+                    // callback to inform scheduler if current render is still valid
+                    // passes only if the draw generation hasn't changed since
+                    // the render was scheduled and bitmap generation succeeds
+                    () => recordedGeneration === this.#currDrawGeneration).catch((error) => {
+                        if (recordedGeneration !== this.#currDrawGeneration) {
+                            return;
+                        }
+                        // callback is async and triggers during each render batch,
+                        // so can occur after draw() completes
+                        // if a worker fails, assume somethings wrong with the scheduling system
+                        // and destroy the scheduler and fall back to single-threaded
+                        // rendering for all future requests
+                        console.error(
+                            "Worker rendering failed; using the main thread renderer.",
+                            error);
+                        this.#renderScheduler?.destroy();
+                        this.#renderScheduler = null;
+                        this.draw();
+                    });
+                    workerRenderScheduled = true;
+                }
+            } catch (error) {
+                console.error(
+                    "Worker rendering could not start; using the main thread renderer.",
+                    error);
+                this.#renderScheduler?.destroy();
+                this.#renderScheduler = null;
+            }
+        }
+        if (!workerRenderScheduled) {
+            this.#renderSingleThreaded(transform);
+        }
+
+        this.#drawAxes(transform, layout);
+        if (layout.legend) {
+            this.#drawLegend(layout.legend);
+        }
+        if (this.#series.every((s) => !s.points.length)) {
+            this.#drawNoData(transform);
+        }
+    }
+
+    /**
+     * Find the plotted point nearest to a position on the canvas, for hover tooltips.
+     *
+     * @param {number} x  Pointer x in CSS pixels, relative to the canvas.
+     * @param {number} y  Pointer y in CSS pixels, relative to the canvas.
+     * @param {number} [threshold]  The farthest a point can be, in CSS pixels.
+     * @returns {Object|null}  The nearest point and its series, or null if none is near.
+     */
+    findNearestPoint(x, y, threshold = 8) {
+        // The displayed size, which the layout uses; not the bitmap size.
+        const width = this.#canvas.clientWidth;
+        const height = this.#canvas.clientHeight;
+        if (!width || !height) {
+            return null;
+        }
+
+        const layout = this.#layout(width, height);
+        const transform = this.#makeTransform(width, height, layout);
+
+        // Checks every point, so this is O(n) per call.
+        let nearest = null;
+        for (let i = 0; i < this.#series.length; i++) {
+            const series = this.#series[i];
+            const { xs, ys, length } = series.points;
+            for (let j = 0; j < length; j++) {
+                const px = transform.toPx(xs[j]);
+                const py = transform.toPy(ys[j]);
+                const distance = Math.hypot(x - px, y - py);
+                if (distance <= threshold && (nearest === null || distance < nearest.distance)) {
+                    nearest = {
+                        series,
+                        seriesIndex: i,
+                        index: j,
+                        x: xs[j],
+                        y: ys[j],
+                        px,
+                        py,
+                        distance,
+                    };
+                }
+            }
+        }
+        return nearest;
+    }
+
+    /**
+     * Draws all series on the main thread.
+     *
+     * @param {{left: number, top: number, right: number, bottom: number}} transform
+     * Plot-area bounds in canvas coordinates.
+     */
+    #renderSingleThreaded(transform) {
+        const ctx = this.#ctx;
+        const pad = POINT_RADIUS + 1;
+        ctx.save();
+        ctx.beginPath();
+        ctx.rect(transform.left - pad, transform.top - pad,
+            transform.right - transform.left + 2 * pad, transform.bottom - transform.top + 2 * pad);
+        ctx.clip();
         this.#series.forEach((s, i) => this.#drawSeries(transform, s, this.#colors[i]));
-        this.#drawLegend();
+        ctx.restore();
+    }
+
+    /**
+     * Composites a worker-rendered bitmap into the staging canvas as masks.
+     * The first chunk clears the offscreen canvas
+     * After the last chunk of a series, the mask is colored and drawn onto the main canvas.
+     *
+     * @param {ImageBitmap} bitmap Rendered mask for one chunk.
+     * @param {{seriesIndex: number, chunkIndex: number, lastChunk: boolean}} task
+     *     Metadata identifying the series and chunk.
+     * @param {string} color CSS color to apply to the completed series mask.
+     * @param {number} width Canvas width in CSS pixels.
+     * @param {number} height Canvas height in CSS pixels.
+     * @param {number} ratio Scale from CSS pixels to backing-bitmap pixels.
+     */
+    #compositeBitmaps(bitmap, task, color, width, height, ratio) {
+        // Create the staging canvas
+        if (!this.#stagingCanvas) {
+            this.#stagingCanvas = this.#canvas.ownerDocument.createElement("canvas");
+            this.#stagingCanvasContext = this.#stagingCanvas.getContext("2d");
+        }
+        const ctx = this.#stagingCanvasContext;
+        if (this.#stagingCanvas.width !== this.#canvas.width
+            || this.#stagingCanvas.height !== this.#canvas.height) {
+            this.#stagingCanvas.width = this.#canvas.width;
+            this.#stagingCanvas.height = this.#canvas.height;
+        }
+        ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
+
+        // clear staging canvas in preparation for first bitmap of new series
+        if (task.chunkIndex === 0) {
+            ctx.globalCompositeOperation = "source-over";
+            ctx.clearRect(0, 0, width, height);
+        }
+
+        // Add this task's bitmap to staging canvas.
+        ctx.drawImage(bitmap, 0, 0, width, height);
+
+        // Wait until every bitmap in this series has been accumulated
+        if (!task.lastChunk) {
+            return;
+        }
+
+        // source-in makes the fillRect only fill/color the masked dots,
+        // therein coloring only the dots
+        ctx.globalCompositeOperation = "source-in";
+        ctx.fillStyle = color;
+        ctx.fillRect(0, 0, width, height);
+        ctx.globalCompositeOperation = "source-over";
+
+        // copy the rendered series onto main canvas
+        this.#ctx.drawImage(this.#stagingCanvas, 0, 0, width, height);
     }
 
     /** Stop observing the canvas and cancel any pending draw. */
@@ -109,38 +354,294 @@ export class Chart {
         this.#observer.disconnect();
         cancelAnimationFrame(this.#frame);
         this.#frame = 0;
+        this.#currDrawGeneration++;
+        this.#renderScheduler?.destroy();
+        this.#renderScheduler = null;
     }
 
-    /**
-     * Called when the canvas's displayed size changes.
-     * TODO(frontend): size the backing store (canvas.width/height) to the
-     * displayed size, accounting for devicePixelRatio.
-     */
+    /** Size the bitmap to the displayed size, accounting for devicePixelRatio. */
     #resize() {
-        this.requestDraw();
+        const canvas = this.#canvas;
+        const width = canvas.clientWidth;
+        const height = canvas.clientHeight;
+        const ratio = window.devicePixelRatio || 1;
+        canvas.width = Math.round(width * ratio);
+        canvas.height = Math.round(height * ratio);
+
+        // Resizing clears the canvas, so draw now.
+        this.draw();
     }
 
-    /**
-     * Data-to-pixel transform, using options.xRange / yRange.
-     * TODO(frontend): implement.
-     * @returns {{ toPx: (x: number) => number, toPy: (y: number) => number }}
-     */
-    #makeTransform() {
-        return { toPx: (x) => x, toPy: (y) => y };
+    /** Set the canvas's displayed size from options.width / height. */
+    #applySize() {
+        this.#canvas.style.width = `${this.#options.width}px`;
+        this.#canvas.style.height = `${this.#options.height}px`;
     }
 
-    /** TODO(frontend): axes and axis labels. */
-    #drawAxes(transform) {
-        void transform;
+    /** Margins, and which of the titles, legend and ticks are on and fit at this size. */
+    #layout(width, height) {
+        const { showAxes, showAxisLabels, showLegend } = this.#options;
+        const fits = (min) => width >= min.width && height >= min.height;
+        const ticks = showAxes && fits(TICKS_MIN);
+        const titles = showAxisLabels && fits(TITLES_MIN);
+        const edge = Math.min(EDGE, Math.floor(Math.min(width, height) / 3));
+        const margin = {
+            left: edge + (ticks ? TICK_SPACE.left : 0) + (titles ? TITLE_SPACE.left : 0),
+            right: ticks ? TICK_SPACE.right : edge,
+            top: ticks ? TICK_SPACE.top : edge,
+            bottom: edge + (ticks ? TICK_SPACE.bottom : 0) + (titles ? TITLE_SPACE.bottom : 0),
+        };
+
+        let legend = showLegend && fits(LEGEND_MIN) ? this.#layoutLegend(width) : null;
+        if (legend && (!legend.entries.length
+            || legend.bottom + LEGEND_GAP - margin.top > height / 4)) {
+            legend = null;
+        }
+        return { edge, margin, ticks, titles, legend };
     }
 
-    /** TODO(frontend): points, plus lines when options.showLine is set. */
+    /** Data-to-pixel transform, using options.xRange / yRange. */
+    #makeTransform(width, height, { margin, legend }) {
+        const left = margin.left;
+        const right = width - margin.right;
+        const top = legend ? legend.bottom + LEGEND_GAP : margin.top;
+        const bottom = height - margin.bottom;
+        const xRange = this.#options.xRange ?? fitRange(this.#series, "xs");
+        const yRange = this.#options.yRange ?? fitRange(this.#series, "ys");
+        const [x0, x1] = xRange;
+        const [y0, y1] = yRange;
+
+        return {
+            left, right, top, bottom, xRange, yRange,
+            toPx: (x) => left + (x - x0) / (x1 - x0) * (right - left),
+            // Canvas y increases downwards.
+            toPy: (y) => bottom - (y - y0) / (y1 - y0) * (bottom - top),
+        };
+    }
+
+    /** Axes and axis labels. */
+    #drawAxes(transform, layout) {
+        if (layout.ticks) {
+            this.#drawTicks(transform);
+        }
+        if (layout.titles) {
+            this.#drawTitles(transform, layout);
+        }
+    }
+
+    /** Axis lines, ticks and tick labels. */
+    #drawTicks(transform) {
+        const ctx = this.#ctx;
+        const { left, right, top, bottom } = transform;
+
+        ctx.lineWidth = 1;
+        ctx.strokeStyle = AXIS_COLOR;
+        ctx.beginPath();
+        ctx.moveTo(left, top);
+        ctx.lineTo(left, bottom);
+        ctx.lineTo(right, bottom);
+        ctx.stroke();
+
+        ctx.font = FONT;
+        ctx.fillStyle = TEXT_COLOR;
+        ctx.textAlign = "center";
+        ctx.textBaseline = "top";
+        for (const tick of ticks(transform.xRange, tickCount(right - left, TICK_GAP.x))) {
+            const px = transform.toPx(tick);
+            ctx.beginPath();
+            ctx.moveTo(px, bottom);
+            ctx.lineTo(px, bottom + 5);
+            ctx.stroke();
+            ctx.fillText(formatTick(tick), px, bottom + TICK_LABEL_GAP);
+        }
+
+        ctx.textAlign = "right";
+        ctx.textBaseline = "middle";
+        for (const tick of ticks(transform.yRange, tickCount(bottom - top, TICK_GAP.y))) {
+            const py = transform.toPy(tick);
+            ctx.beginPath();
+            ctx.moveTo(left - 5, py);
+            ctx.lineTo(left, py);
+            ctx.stroke();
+            ctx.fillText(formatTick(tick), left - TICK_LABEL_GAP, py,
+                TICK_SPACE.left - TICK_LABEL_GAP);
+        }
+    }
+
+    /** Axis labels. */
+    #drawTitles(transform, layout) {
+        const ctx = this.#ctx;
+        const { left, right, top, bottom } = transform;
+        const { xLabel, yLabel } = this.#options;
+        ctx.fillStyle = TEXT_COLOR;
+        ctx.font = LABEL_FONT;
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        const xTitleY = this.#canvas.clientHeight - layout.edge - TITLE_SPACE.bottom / 2;
+        ctx.fillText(xLabel, (left + right) / 2, xTitleY, right - left);
+        ctx.save();
+        ctx.translate(Y_TITLE_X, (top + bottom) / 2);
+        ctx.rotate(-Math.PI / 2);
+        ctx.textBaseline = "middle";
+        ctx.fillText(yLabel, 0, 0, bottom - top);
+        ctx.restore();
+    }
+
+    /** Points, or lines when options.showLine is set. */
     #drawSeries(transform, series, color) {
-        void transform;
-        void series;
-        void color;
+        const ctx = this.#ctx;
+        const { xs, ys, length } = series.points;
+        if (!length) {
+            return;
+        }
+
+        ctx.strokeStyle = color;
+        ctx.fillStyle = color;
+
+        // A single point has no line, so it is drawn as a point.
+        if (this.#options.showLine && length > 1) {
+            series.points.sort();
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(transform.toPx(xs[0]), transform.toPy(ys[0]));
+            for (let i = 1; i < length; i++) {
+                ctx.lineTo(transform.toPx(xs[i]), transform.toPy(ys[i]));
+            }
+            ctx.stroke();
+            return;
+        }
+
+        ctx.beginPath();
+        for (let i = 0; i < length; i++) {
+            const px = transform.toPx(xs[i]);
+            const py = transform.toPy(ys[i]);
+            ctx.moveTo(px + POINT_RADIUS, py);
+            ctx.arc(px, py, POINT_RADIUS, 0, Math.PI * 2);
+        }
+        ctx.fill();
     }
 
-    /** TODO(frontend): legend, using each series' name and color. */
-    #drawLegend() {}
+    /** Legend entry positions, wrapping into rows above the plot. */
+    #layoutLegend(width) {
+        const ctx = this.#ctx;
+        ctx.font = FONT;
+
+        const entries = [];
+        const maxTextWidth = width - 2 * LEGEND_INSET - LEGEND_SWATCH - 18;
+        let x = LEGEND_INSET;
+        let y = LEGEND_INSET;
+        this.#series.forEach((s, i) => {
+            const textWidth = Math.min(ctx.measureText(s.name).width, maxTextWidth);
+            const entryWidth = LEGEND_SWATCH + 8 + textWidth + 26;
+            if (x > LEGEND_INSET && x + entryWidth > width - LEGEND_INSET) {
+                x = LEGEND_INSET;
+                y += LEGEND_ROW;
+            }
+            entries.push({ name: s.name, color: this.#colors[i], x, y, textWidth });
+            x += entryWidth;
+        });
+
+        return { entries, bottom: y + LEGEND_ROW / 2 };
+    }
+
+    /** Legend, using each series' name and color. */
+    #drawLegend(legend) {
+        const ctx = this.#ctx;
+        ctx.font = FONT;
+        ctx.textAlign = "left";
+        ctx.textBaseline = "middle";
+        for (const entry of legend.entries) {
+            ctx.fillStyle = entry.color;
+            ctx.fillRect(entry.x, entry.y - LEGEND_SWATCH / 2, LEGEND_SWATCH, LEGEND_SWATCH);
+            ctx.fillStyle = TEXT_COLOR;
+            ctx.fillText(entry.name, entry.x + LEGEND_SWATCH + 8, entry.y, entry.textWidth || 1);
+        }
+    }
+
+    /** "No data", centered in the plot. */
+    #drawNoData(transform) {
+        const ctx = this.#ctx;
+        ctx.font = FONT;
+        ctx.fillStyle = TEXT_COLOR;
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillText("No data", (transform.left + transform.right) / 2,
+            (transform.top + transform.bottom) / 2);
+    }
+}
+
+/** Throw if options.width or options.height is set but not a positive size. */
+function checkSize(options) {
+    for (const name of ["width", "height"]) {
+        const value = options[name];
+        if (value !== undefined && !(Number.isFinite(value) && value > 0)) {
+            throw new RangeError(`Chart ${name} must be a positive number of pixels`);
+        }
+    }
+}
+
+/** Axis range fitting every series, rounded out to tick values. */
+function fitRange(series, axis) {
+    let min = Infinity;
+    let max = -Infinity;
+    for (const s of series) {
+        for (const value of s.points[axis]) {
+            min = Math.min(min, value);
+            max = Math.max(max, value);
+        }
+    }
+
+    if (min > max) {
+        return [0, 1];
+    }
+    if (min === max) {
+        return [min - 1, max + 1];
+    }
+    const step = tickStep(max - min);
+    return [Math.floor(min / step) * step, Math.ceil(max / step) * step];
+}
+
+/** Number of ticks for an axis of this length, at most TICK_COUNT. */
+function tickCount(length, gap) {
+    return Math.max(1, Math.min(TICK_COUNT, Math.floor(length / gap)));
+}
+
+/** Tick spacing: 1, 2 or 5 times a power of ten. */
+function tickStep(span, count = TICK_COUNT) {
+    const raw = span / count;
+    const power = 10 ** Math.floor(Math.log10(raw));
+    const scaled = raw / power;
+    if (scaled < 1.5) {
+        return power;
+    }
+    if (scaled < 3) {
+        return 2 * power;
+    }
+    if (scaled < 7) {
+        return 5 * power;
+    }
+    return 10 * power;
+}
+
+/** Tick values within a range. */
+function ticks([start, end], count) {
+    const low = Math.min(start, end);
+    const high = Math.max(start, end);
+    if (!(high > low) || !Number.isFinite(high - low)) {
+        return [];
+    }
+
+    const step = tickStep(high - low, count);
+    const first = Math.ceil(low / step);
+    const last = Math.floor(high / step);
+    const result = [];
+    for (let i = first; i <= last; i++) {
+        result.push(i * step);
+    }
+    return result;
+}
+
+/** Format a tick without floating-point noise. */
+function formatTick(value) {
+    return String(Number(value.toPrecision(12)));
 }

@@ -1,0 +1,23 @@
+:root { font-family: system-ui, sans-serif; line-height: 1.5; color-scheme: light; }
+body { margin: 0; color: #222; background: white; }
+main { max-width: 1000px; margin: auto; padding: 24px; }
+h1, h2 { line-height: 1.2; }
+header p:first-child { font-size: 0.9rem; }
+form { display: flex; flex-wrap: wrap; gap: 16px; margin-block: 24px; }
+label { display: grid; gap: 4px; }
+select, input, button { font: inherit; padding: 6px; }
+select, input { max-width: 100%; box-sizing: border-box; }
+form > button { align-self: end; }
+figure { margin: 0; }
+canvas { display: block; width: 100%; height: clamp(320px, 50vw, 500px); border: 1px solid #aaa; box-sizing: border-box; }
+figcaption { margin-top: 8px; }
+details { margin-block: 20px; }
+summary { cursor: pointer; }
+.table-scroll { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; margin-top: 12px; }
+caption { text-align: left; padding-block: 8px; }
+th, td { text-align: left; padding: 8px; border-bottom: 1px solid #ddd; }
+#error { padding: 12px; border: 1px solid #a00; color: #900; }
+footer { margin-top: 28px; }
+.series-marker { display: inline-block; width: 12px; height: 12px; margin-right: 8px; }
+@media (max-width: 480px) { main { padding: 16px; } form > label { width: 100%; } }
