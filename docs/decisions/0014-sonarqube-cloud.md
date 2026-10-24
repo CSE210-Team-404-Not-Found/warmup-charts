@@ -62,7 +62,7 @@ One-time setup:
    analysis from CircleCI is rejected.
 2. Generate a personal token in SonarQube Cloud (My account > Access Tokens)
    from an account with the Execute Analysis permission, and store it as
-   `SONAR_TOKEN` in a CircleCI context named `sonarcloud` (Organization
+   `SONAR_TOKEN` in a CircleCI context named `SonarCloud` (Organization
    Settings > Contexts). Tokens expire after a year at most.
 3. Add a second trigger to the CircleCI project for the "PR opened" event,
    so a pull request opened after its last push is analyzed at once rather
