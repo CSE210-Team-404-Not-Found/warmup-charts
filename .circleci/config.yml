@@ -1,6 +1,10 @@
-# Checks on every push, and the GitHub Pages deploy of main. See ADR-0013.
+# Checks on every push, SonarQube Cloud analysis of main and pull requests, and
+# the GitHub Pages deploy of main. See ADR-0013 and ADR-0014.
 
 version: 2.1
+
+orbs:
+  sonarcloud: sonarsource/sonarcloud@4.0
 
 executors:
   node:
@@ -12,16 +16,18 @@ jobs:
     executor: node
     steps:
       - checkout
-      - restore_cache:
-          keys:
-            - npm-{{ checksum "package-lock.json" }}
       - run: npm ci
-      - save_cache:
-          key: npm-{{ checksum "package-lock.json" }}
-          paths:
-            - ~/.npm
       - run: npm run lint
       - run: npm test
+
+  analyze:
+    executor: node
+    steps:
+      - checkout
+      - run: .circleci/scripts/halt-unless-main-or-pull-request.sh
+      - run: npm ci
+      - run: npm run coverage
+      - sonarcloud/scan
 
   deploy:
     executor: node
@@ -37,6 +43,8 @@ workflows:
   check-and-deploy:
     jobs:
       - check
+      - analyze:
+          context: SonarCloud
       - deploy:
           requires: [check]
           filters:
