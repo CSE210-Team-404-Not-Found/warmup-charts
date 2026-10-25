@@ -159,9 +159,18 @@ npm run lint
 npm test
 ```
 
-CircleCI runs them on every push and pull request, and publishes `main` to
-GitHub Pages when they pass. SonarQube Cloud analyzes `main` and each pull
+CircleCI runs them on every push and pull request, and publishes each release
+to GitHub Pages (ADR-0015). SonarQube Cloud analyzes `main` and each pull
 request from the same pipeline, test coverage included, and reports on the
 pull request (ADR-0014).
 ESLint's rules include the code-smell limits chosen in
 [docs/code-analysis.md](docs/code-analysis.md).
+
+## Releases
+Pull request titles follow Conventional Commits, such as
+`feat(chart): add a log scale`, and a GitHub check holds the squash merge until
+the title does. release-please turns the merged titles into a release pull
+request carrying the version bump and the changelog. Merging that pull request
+tags the release, publishes its notes on GitHub and deploys the site. The
+version is `VERSION` in `src/index.js` and shows in the page header. See
+[docs/releases.md](docs/releases.md) and ADR-0015.

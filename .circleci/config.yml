@@ -1,5 +1,6 @@
-# Checks on every push, SonarQube Cloud analysis of main and pull requests, and
-# the GitHub Pages deploy of main. See ADR-0013 and ADR-0014.
+# Checks on every push, SonarQube Cloud analysis of main and pull requests,
+# release pull requests on main, and the GitHub Pages deploy of each release
+# tag. See ADR-0013, ADR-0014 and ADR-0015.
 
 version: 2.1
 
@@ -29,6 +30,14 @@ jobs:
       - run: npm run coverage
       - sonarcloud/scan
 
+  release:
+    executor: node
+    environment:
+      REPOSITORY: << pipeline.git.repo_owner >>/<< pipeline.git.repo_name >>
+    steps:
+      - checkout
+      - run: .circleci/scripts/release.sh
+
   deploy:
     executor: node
     environment:
@@ -41,12 +50,25 @@ jobs:
 
 workflows:
   check-and-deploy:
+    # A job runs on a release tag only if it, and every job it requires, has a
+    # tags filter. Branches are unaffected by a tags filter.
     jobs:
-      - check
+      - check:
+          filters:
+            tags:
+              only: /^v.*/
       - analyze:
           context: SonarCloud
-      - deploy:
+      - release:
+          context: GitHub
           requires: [check]
           filters:
             branches:
               only: main
+      - deploy:
+          requires: [check]
+          filters:
+            branches:
+              ignore: /.*/
+            tags:
+              only: /^v.*/
