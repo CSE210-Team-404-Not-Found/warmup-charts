@@ -159,5 +159,7 @@ npm run lint
 npm test
 ```
 
-GitHub Actions runs them on every push and pull request, and before each
-deploy to GitHub Pages.
+CircleCI runs them on every push and pull request, and publishes `main` to
+GitHub Pages when they pass. SonarQube Cloud analyzes `main` and each pull
+request from the same pipeline, test coverage included, and reports on the
+pull request (ADR-0014).

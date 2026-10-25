@@ -4,7 +4,8 @@
   "type": "module",
   "scripts": {
     "lint": "eslint .",
-    "test": "node --test \"test/**/*.test.js\" \"prototypes/graph-plotter/test/*.test.js\""
+    "test": "node --test \"test/**/*.test.js\" \"prototypes/graph-plotter/test/*.test.js\"",
+    "coverage": "node --test --experimental-test-coverage --test-reporter=spec --test-reporter-destination=stdout --test-reporter=lcov --test-reporter-destination=lcov.info \"test/**/*.test.js\""
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
