@@ -29,12 +29,28 @@ jobs:
       - run: npm run coverage
       - sonarcloud/scan
 
+  build-docs:
+    executor: node
+    steps:
+      - checkout
+      - run: npm ci
+      - run: npm run docs
+      # - store_artifacts:
+      #     path: docs/generated
+      #     destination: docs
+      - persist_to_workspace:
+          root: .
+          paths:
+            - docs/generated
+
   deploy:
     executor: node
     environment:
       REPOSITORY: << pipeline.git.repo_owner >>/<< pipeline.git.repo_name >>
     steps:
       - checkout
+      - attach_workspace:
+          at: .
       - add_ssh_keys
       - run: .circleci/scripts/stage-site.sh _site
       - run: .circleci/scripts/publish-branch.sh _site gh-pages
@@ -43,10 +59,11 @@ workflows:
   check-and-deploy:
     jobs:
       - check
+      - build-docs
       - analyze:
           context: SonarCloud
       - deploy:
-          requires: [check]
+          requires: [check, build-docs]
           filters:
             branches:
               only: main
