@@ -5,12 +5,14 @@
   "scripts": {
     "lint": "eslint .",
     "test": "node --test \"test/**/*.test.js\" \"prototypes/graph-plotter/test/*.test.js\"",
-    "coverage": "node --test --experimental-test-coverage --test-reporter=spec --test-reporter-destination=stdout --test-reporter=lcov --test-reporter-destination=lcov.info \"test/**/*.test.js\""
+    "coverage": "node --test --experimental-test-coverage --test-reporter=spec --test-reporter-destination=stdout --test-reporter=lcov --test-reporter-destination=lcov.info \"test/**/*.test.js\"",
+    "docs": "jsdoc -c jsdoc.json"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
     "@stylistic/eslint-plugin": "^5.10.0",
     "eslint": "^10.12.0",
-    "globals": "^17.13.0"
+    "globals": "^17.13.0",
+    "jsdoc": "^4.0.5"
   }
 }

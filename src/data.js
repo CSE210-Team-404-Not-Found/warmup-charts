@@ -49,9 +49,9 @@ function rounded(value) {
  *
  * @param {string} text Raw CSV file contents.
  * @param {Object} [options]
- * @param {(counts: { skippedRows: number, skippedCells: number, roundedPoints: number })
- *     => void} [options.onWarning]  Called once, after parsing, if any rows or
- *     cells were skipped or any points were rounded by Float32 storage.
+ * @param {function(Object): void} [options.onWarning]  Called once, after parsing, if any rows or
+ *     cells were skipped or any points were rounded by Float32 storage. Receives a
+ *     counts object with skippedRows, skippedCells, and roundedPoints.
  * @returns {Series[]}
  */
 export function parseCSV(text, { onWarning } = {}) {
@@ -132,7 +132,7 @@ export function parseCSV(text, { onWarning } = {}) {
  * @param {number} [options.xMax]  Largest x value (default 10).
  * @param {number} [options.yMin]  Smallest y value (default 0).
  * @param {number} [options.yMax]  Largest y value (default 10).
- * @param {() => number} [options.random]  Source of values in [0, 1).
+ * @param {function(): number} [options.random]  Source of values in [0, 1).
  *     Defaults to Math.random; pass a fixed sequence for repeatable tests.
  * @returns {Series[]}
  */

@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>JSDoc: Home</title>
+
+    <script src="scripts/prettify/prettify.js"> </script>
+    <script src="scripts/prettify/lang-css.js"> </script>
+    <!--[if lt IE 9]>
+      <script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script>
+    <![endif]-->
+    <link type="text/css" rel="stylesheet" href="styles/prettify-tomorrow.css">
+    <link type="text/css" rel="stylesheet" href="styles/jsdoc-default.css">
+</head>
+
+<body>
+
+<div id="main">
+
+    <h1 class="page-title">Home</h1>
+
+    
+
+
+
+    
+
+
+    <h3> </h3>
+
+
+
+
+
+
+
+
+
+
+    
+
+
+
+
+    <section>
+        <article><h1>warmup-charts</h1>
+<p>Team 7-11 \ CSE 210</p>
+<p>A canvas charting library for scatter plots and line graphs.</p>
+<p>warmup-charts draws data series on an HTML <code>&lt;canvas&gt;</code>, either as individual
+points or connected by lines. It is written in plain JavaScript and has no
+dependencies or build step.</p>
+<ul>
+<li>Multiple series per chart, each with its own color and legend entry</li>
+<li>Any number of independent charts on one page</li>
+<li>CSV loading that skips malformed rows and cells</li>
+<li>Typed-array point storage, designed for data sets with millions of points</li>
+</ul>
+<p>A live demo is available at https://cse210-team-7-11.github.io/warmup-charts/.</p>
+<h2>Running the demo</h2>
+<p>The page uses ES modules, which browsers won't load from <code>file://</code>. Instead, serve the file with <code>python3</code>:</p>
+<pre class="prettyprint source lang-sh"><code>cd &lt;project-directory>
+python3 -m http.server
+</code></pre>
+<p>Then open http://localhost:8000.</p>
+<h2>Using the library</h2>
+<p>A chart is created on a <code>&lt;canvas&gt;</code> element and given a list of series, along
+with one color per series.</p>
+<pre class="prettyprint source lang-js"><code>import { Chart, randomData } from &quot;./src/index.js&quot;;
+
+const chart = new Chart(document.querySelector(&quot;canvas&quot;), { showLine: true });
+const series = randomData({ seriesCount: 2 });
+chart.setSeries(series, [&quot;red&quot;, &quot;blue&quot;]);
+</code></pre>
+<p>All public exports are in <code>src/index.js</code>. The other modules in <code>src/</code> are internal.</p>
+<h2>CSV format</h2>
+<p>The header row names the x column, followed by each series. Each subsequent
+row contains an x value and the value of each series at that x. An empty cell
+indicates that the series has no point at that x.</p>
+<pre class="prettyprint source lang-csv"><code>x,Revenue,Cost
+0,1.2,0.8
+1,1.5,
+2,1.7,1.1
+</code></pre>
+<h2>API</h2>
+<h3><code>new Chart(canvas, options)</code></h3>
+<p>Creates a chart on a <code>&lt;canvas&gt;</code> element. The options are <code>width</code> and <code>height</code>
+in CSS pixels (default 800 × 450), <code>showLine</code> (default <code>false</code>), the axis labels
+<code>xLabel</code> and <code>yLabel</code>, and the fixed axis ranges <code>xRange</code> and <code>yRange</code>, each
+given as <code>[start, end]</code>. Without a fixed range, an axis fits the data. The
+chart sizes the canvas's bitmap to match its displayed size, including on
+high-density screens.</p>
+<p><code>showAxes</code>, <code>showAxisLabels</code> and <code>showLegend</code> (all default <code>true</code>) turn those
+parts on and off. Small charts also drop them when they don't fit: axis labels
+below 240 × 200, the legend below 160 × 120 or when it would take over a quarter
+of the height, and axes below 120 × 100, leaving only the data.</p>
+<p><code>setSeries(series, colors)</code> replaces the chart's data, with one CSS color per
+series in the same order. <code>setOptions(options)</code> merges new options into the
+current ones. The chart redraws on the next frame after either call and
+whenever its canvas is resized. <code>draw()</code> starts a redraw immediately.</p>
+<p>For large scatter plots (18,000 points or more), browsers with module workers
+and <code>OffscreenCanvas</code> render data layers in a pool of up to 32 workers. Axes,
+labels, layout, and final composition remain on the main thread. Smaller
+datasets, line charts, and browsers without the required APIs use the regular
+main-thread renderer.</p>
+<p><code>destroy()</code> disconnects the chart from its canvas.</p>
+<h3><code>new Series(name, points)</code></h3>
+<p>Creates a series from a name, shown in the legend, and a <code>PointSet</code>.</p>
+<pre class="prettyprint source lang-js"><code>const series = new Series(&quot;Revenue&quot;, PointSet.fromArrays([0, 1, 2], [1.2, 1.5, 1.7]));
+</code></pre>
+<h3><code>PointSet</code></h3>
+<p>Holds points stored as <code>Float32Array</code>s, in the order they were added.
+<code>PointSet.fromArrays(xs, ys)</code> copies existing arrays into a new set. To load
+points individually, create a set with a fixed capacity and push the points in
+any order.</p>
+<p><code>sort()</code> sorts the points by x, then y, in place without allocating. It is a
+no-op if they are already sorted, and <code>sorted</code> reports whether they are. A
+chart sorts a series only to draw it as a line; scatter plots are drawn in
+any order.</p>
+<pre class="prettyprint source lang-js"><code>const points = new PointSet(1000);
+points.push(3, 30);
+points.push(1, 10);
+points.sort();
+</code></pre>
+<p><code>push</code> throws if the set is full. <code>xs</code> and <code>ys</code> return the stored coordinates
+as read-only views, and <code>start</code> and <code>end</code> return the first and last points in
+sort order, without sorting.</p>
+<p>Coordinates are stored with about 7 significant digits of precision, which is
+insufficient for large x values such as Unix timestamps.</p>
+<h3><code>parseCSV(text, { onWarning })</code></h3>
+<p>Returns one <code>Series</code> per column of the <a href="#csv-format">CSV format</a> and throws if
+the header is invalid. If anything was skipped or rounded by Float32 storage,
+<code>onWarning</code> is called with <code>{ skippedRows, skippedCells, roundedPoints }</code>.</p>
+<pre class="prettyprint source lang-js"><code>const series = parseCSV(text, { onWarning: console.warn });
+</code></pre>
+<h3><code>randomData(options)</code></h3>
+<p>Returns randomly generated series for testing. The default is one series of
+10 points, with x and y between 0 and 10. <code>seriesCount</code> and <code>pointCount</code> set
+the size, and <code>xMin</code>, <code>xMax</code>, <code>yMin</code>, and <code>yMax</code> set the ranges. <code>random</code>
+accepts a function returning numbers in <code>[0, 1)</code>, for repeatable tests.</p>
+<pre class="prettyprint source lang-js"><code>const series = randomData({ seriesCount: 3, pointCount: 100000 });
+</code></pre>
+<h2>Sample data</h2>
+<p><code>data/</code> contains a single-series file, a two-series file, a header-only file,
+and a malformed file for testing how invalid input is handled.</p>
+<h2>Layout</h2>
+<p><code>src/</code> contains the charting library; <code>index.html</code> and <code>demo/</code> instantiate the chart and demonstrate its usage.</p>
+<table>
+<thead>
+<tr>
+<th>Path</th>
+<th>Owner</th>
+<th>Contents</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>src/index.js</code></td>
+<td>Both</td>
+<td>The library's public API, and the only module pages import</td>
+</tr>
+<tr>
+<td><code>src/chart.js</code></td>
+<td>Frontend</td>
+<td><code>Chart</code>, which draws and manages one chart</td>
+</tr>
+<tr>
+<td><code>src/series.js</code></td>
+<td>Both</td>
+<td><code>Series</code>, which passes data from the backend to the frontend</td>
+</tr>
+<tr>
+<td><code>src/point-set.js</code></td>
+<td>Backend</td>
+<td><code>PointSet</code>, which stores each series' points</td>
+</tr>
+<tr>
+<td><code>src/data.js</code></td>
+<td>Backend</td>
+<td><code>parseCSV(text)</code> and <code>randomData(options)</code>, both returning <code>Series[]</code></td>
+</tr>
+<tr>
+<td><code>index.html</code>, <code>style.css</code>, <code>demo/</code></td>
+<td>Frontend</td>
+<td>Demo page using the library, with a 7-11 theme toggle</td>
+</tr>
+<tr>
+<td><code>data/</code></td>
+<td>Backend</td>
+<td>Sample CSVs</td>
+</tr>
+<tr>
+<td><code>test/</code></td>
+<td>Backend</td>
+<td>Unit tests for the library</td>
+</tr>
+<tr>
+<td><code>docs/decisions/</code></td>
+<td>Leads</td>
+<td>Architecture Decision Records (MADR)</td>
+</tr>
+<tr>
+<td><code>docs/meetings/</code></td>
+<td>Leads</td>
+<td>Meeting notes</td>
+</tr>
+</tbody>
+</table>
+<h2>Checks</h2>
+<p>These need Node.js 22 or later.</p>
+<pre class="prettyprint source lang-sh"><code>npm ci
+npm run lint
+npm test
+</code></pre>
+<p>CircleCI runs them on every push and pull request, and publishes <code>main</code> to
+GitHub Pages when they pass. SonarQube Cloud analyzes <code>main</code> and each pull
+request from the same pipeline, test coverage included, and reports on the
+pull request (ADR-0014).</p></article>
+    </section>
+
+
+
+
+
+
+</div>
+
+<nav>
+    <h2><a href="index.html">Home</a></h2><h3>Classes</h3><ul><li><a href="Chart_Chart.html">Chart</a></li><li><a href="PointSet_PointSet.html">PointSet</a></li><li><a href="RenderScheduler.html">RenderScheduler</a></li><li><a href="Series_Series.html">Series</a></li></ul><h3>Global</h3><ul><li><a href="global.html#INSERTION_SORT_MAX">INSERTION_SORT_MAX</a></li><li><a href="global.html#checkSize">checkSize</a></li><li><a href="global.html#createChunkIndices">createChunkIndices</a></li><li><a href="global.html#data">data</a></li><li><a href="global.html#fitRange">fitRange</a></li><li><a href="global.html#formatTick">formatTick</a></li><li><a href="global.html#introsort">introsort</a></li><li><a href="global.html#parseCSV">parseCSV</a></li><li><a href="global.html#partition">partition</a></li><li><a href="global.html#randomData">randomData</a></li><li><a href="global.html#render">render</a></li><li><a href="global.html#tickCount">tickCount</a></li><li><a href="global.html#tickStep">tickStep</a></li><li><a href="global.html#ticks">ticks</a></li></ul>
+</nav>
+
+<br class="clear">
+
+<footer>
+    Documentation generated by <a href="https://github.com/jsdoc/jsdoc">JSDoc 4.0.5</a> on Sun Oct 25 2026 15:43:56 GMT-0700 (Pacific Daylight Time)
+</footer>
+
+<script> prettyPrint(); </script>
+<script src="scripts/linenumber.js"> </script>
+</body>
+</html>
