@@ -206,6 +206,13 @@ All the tests should pass in under a minute.
 Playwright's Docker image. The version of that image must match the version of
 `@playwright/test` in `package.json` so update both together.
 
+**Coverage.** Each test records which lines of the page's scripts the browser
+ran, and the run ends by merging them into `test-results/e2e-lcov.info`.
+CircleCI hands that file to the `analyze` job, so Sonar counts the browser
+tests towards coverage next to the Node tests. It counts lines executed, not
+behaviour checked: a line the browser ran while a test looked at something
+else still counts.
+
 **Limitations.** The chart is drawn on a canvas. The page cannot tell the
 tests where the points are. Instead, the tests find points by looking for each
 series' color in the canvas pixels. Anything that is only visible in the

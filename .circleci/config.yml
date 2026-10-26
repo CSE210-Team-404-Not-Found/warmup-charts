@@ -30,6 +30,10 @@ jobs:
       - checkout
       - run: npm ci
       - run: npm run e2e
+      # The browser tests' coverage, for the analyze job.
+      - persist_to_workspace:
+          root: .
+          paths: [test-results/e2e-lcov.info]
       - store_test_results:
           path: test-results
       - store_artifacts:
@@ -40,6 +44,8 @@ jobs:
     steps:
       - checkout
       - run: .circleci/scripts/halt-unless-main-or-pull-request.sh
+      - attach_workspace:
+          at: .
       - run: npm ci
       - run: npm run coverage
       - sonarcloud/scan
@@ -74,6 +80,7 @@ workflows:
       - e2e
       - analyze:
           context: SonarCloud
+          requires: [e2e]
       - release:
           context: GitHub
           requires: [check]
