@@ -6,7 +6,9 @@
  * Displays one chart with random data, a sample from data/, or a chosen CSV file.
  */
 
-import { Chart, parseCSV, randomData } from "../src/index.js";
+import { Chart, VERSION, parseCSV, randomData } from "../src/index.js";
+
+document.getElementById("version").textContent = `v${VERSION}`;
 
 const datasets = document.getElementById("test-sets");
 const input = document.getElementById("csv-input");
