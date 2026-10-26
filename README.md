@@ -165,3 +165,22 @@ request from the same pipeline, test coverage included, and reports on the
 pull request (ADR-0014).
 ESLint's rules include the code-smell limits chosen in
 [docs/code-analysis.md](docs/code-analysis.md).
+
+Run coverage and generate `lcov.info`:
+
+```sh
+npm run coverage
+```
+
+Run coverage with the minimum line coverage check:
+
+```sh
+npm run coverage:check
+```
+
+The team agreed to keep the minimum line coverage at 50% for now, based on
+the measured baseline of 50.83%. Additional tests and a higher threshold can
+be introduced in the final project. The threshold is configured in `package.json`.
+CircleCI's `check` job displays coverage and fails below this minimum.
+Both coverage commands run `test/**/*.test.js`; `npm test` also runs the
+prototype tests. SonarQube Cloud continues to use `lcov.info`.
