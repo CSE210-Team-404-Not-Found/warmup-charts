@@ -227,3 +227,7 @@ request carrying the version bump and the changelog. Merging that pull request
 tags the release, publishes its notes on GitHub and deploys the site. The
 version is `VERSION` in `src/index.js` and shows in the page header. See
 [docs/releases.md](docs/releases.md) and ADR-0015.
+
+## Contributing
+See [CONTRIBUTING.md](CONTRIBUTING.md) for the team's GitHub, code, and
+repository README standards.
