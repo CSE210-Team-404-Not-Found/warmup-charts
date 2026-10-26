@@ -21,6 +21,20 @@ jobs:
       - run: npm run lint
       - run: npm test
 
+  e2e:
+    # Playwright's image has its browsers installed. Its version must match
+    # @playwright/test in package.json.
+    docker:
+      - image: mcr.microsoft.com/playwright:v1.64.1-noble
+    steps:
+      - checkout
+      - run: npm ci
+      - run: npm run e2e
+      - store_test_results:
+          path: test-results
+      - store_artifacts:
+          path: test-results
+
   analyze:
     executor: node
     steps:
@@ -57,6 +71,7 @@ workflows:
           filters:
             tags:
               only: /^v.*/
+      - e2e
       - analyze:
           context: SonarCloud
       - release:

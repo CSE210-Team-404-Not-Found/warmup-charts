@@ -166,6 +166,52 @@ pull request (ADR-0014).
 ESLint's rules include the code-smell limits chosen in
 [docs/code-analysis.md](docs/code-analysis.md).
 
+## E2E tests
+The end-to-end (E2E) tests open the demo in a real browser and use it the way a
+person would: loading files, changing options, hovering over points and downloading the chart. We use [Playwright](https://playwright.dev) to drive the
+browser. Each test checks one acceptance criterion from the user stories in
+`docs/user-stories.md`.
+
+**Files.** The following files are in `e2e/`:
+
+- `load-csv.spec.js`, `read-data.spec.js`, `tooltip.spec.js`, `customize.spec.js`,
+  and `large-data.spec.js` contain the tests, one file for each of the five user
+  stories.
+- `helpers.js` contains the steps the tests share such as opening the demo,
+  uploading a file and finding a series' color on the chart.
+- `server.js` is a small file server that Playwright starts before the tests so
+  you don't need to start one yourself.
+- `fixtures/` contains small CSV files whose points land in known places.
+
+**Getting Started.** You will need Node.js 22 or later. Install the dependencies
+and Chromium and then run the tests:
+
+```sh
+npm ci
+npx playwright install chromium
+npm run e2e
+```
+
+All the tests should pass in under a minute.
+
+**Running and Debugging Tips.**
+
+- To run a single file you give its path. e.g. `npx playwright test e2e/tooltip.spec.js`.
+- Add `--headed` to watch the browser while the tests run or `--ui` to open
+  Playwright's test viewer where you can step through each test.
+- When a test fails, Playwright saves a trace in `test-results/`. You can open it
+  with `npx playwright show-trace <path to trace.zip>`.
+
+**Continuous Integration.** CircleCI runs the E2E tests on every push in
+Playwright's Docker image. The version of that image must match the version of
+`@playwright/test` in `package.json` so update both together.
+
+**Limitations.** The chart is drawn on a canvas. The page cannot tell the
+tests where the points are. Instead, the tests find points by looking for each
+series' color in the canvas pixels. Anything that is only visible in the
+picture such as how the axes fit the data or the order in which a line connects
+its points is not tested.
+
 ## Releases
 Pull request titles follow Conventional Commits, such as
 `feat(chart): add a log scale`, and a GitHub check holds the squash merge until

@@ -23,6 +23,11 @@ export default [
         files: ["test/**/*.js", "eslint.config.js"],
         languageOptions: { globals: globals.node },
     },
+    // E2E tests run in Node but pass some functions to the page.
+    {
+        files: ["e2e/**/*.js", "playwright.config.js"],
+        languageOptions: { globals: { ...globals.node, ...globals.browser } },
+    },
 
     {
         rules: {
