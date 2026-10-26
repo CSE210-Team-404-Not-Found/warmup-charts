@@ -13,6 +13,8 @@ if (process.env.CI) {
 
 export default defineConfig({
     testDir: "e2e",
+    // after the run, merge each test's coverage into test-results/e2e-lcov.info
+    globalTeardown: "./e2e/coverage-to-lcov.js",
     fullyParallel: true,
     // CircleCI's machine has 2 cpus, more browsers than that just slows everything down
     workers: process.env.CI ? 2 : undefined,

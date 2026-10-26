@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./coverage.js";
 import {
     COLORS, applyChanges, findColor, hideLegend, openDemo, uploadCSV, waitForColor,
 } from "./helpers.js";

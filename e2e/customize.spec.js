@@ -1,5 +1,5 @@
 import { readFile } from "node:fs/promises";
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./coverage.js";
 import { applyChanges, openDemo } from "./helpers.js";
 
 // story 4: customize the chart and save it (docs/user-stories.md)

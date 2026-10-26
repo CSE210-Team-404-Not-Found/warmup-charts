@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./coverage.js";
 import { COLORS, hideLegend, openDemo, uploadCSV, waitForColor } from "./helpers.js";
 
 // story 3: see a point's exact value (docs/user-stories.md)

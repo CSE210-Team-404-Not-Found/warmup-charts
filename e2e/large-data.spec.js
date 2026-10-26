@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./coverage.js";
 import { COLORS, hideLegend, openDemo, waitForColor } from "./helpers.js";
 
 // story 5: chart a million points without freezing the page (docs/user-stories.md)
