@@ -15,8 +15,9 @@ deploys the site.
 The title becomes the commit on `main` and a line in the changelog, so it is
 the one thing to get right. The format is `type(scope): subject`. The scope is
 optional and names the area, such as `chart`, `data`, `demo`, `ci` or `docs`.
-The subject says what the change does, in the imperative, without a trailing
-period.
+The subject says what the change does, in the imperative (`add`, not `added`
+or `adds`), without a trailing period. The check rejects the period; the
+imperative is for the reviewer to ask for.
 
 | Type | Use it for | Effect on the version |
 |---|---|---|
@@ -36,8 +37,9 @@ Examples that pass: `feat(chart): add a log scale`, `fix(data): keep rows
 with a trailing comma`, `docs: record the release process`.
 
 Examples that fail: `Add log scale` (no type), `Feat: log scale` (type is
-case-sensitive), `feat(chart) add log scale` (missing colon), `Ci/releases`
-(GitHub's default title from a branch name).
+case-sensitive), `feat(chart) add log scale` (missing colon), `feat(chart):
+add log scale.` (trailing period), `Ci/releases` (GitHub's default title from
+a branch name).
 
 A breaking change, meaning something a caller of `src/index.js` has to
 change, gets a `!` after the type or scope, as in `feat(chart)!: rename
@@ -157,8 +159,8 @@ until a new token replaces the variable in the `GitHub` context.
   tag are all silent types. Check the title of the merged pull request; if it
   should have been a `feat` or `fix`, use the override described under Making
   a release.
-* **"Validate PR title" fails.** The title does not match the format or uses a
-  type not in the table. Edit the title.
+* **"Validate PR title" fails.** The title does not match the format, uses a
+  type not in the table, or ends with a period. Edit the title.
 * **The `release` job fails with 401 or 403.** The token in the `GitHub`
   context expired or lost a permission. Replace it.
 * **The release pull request has conflicts.** Someone edited `CHANGELOG.md`

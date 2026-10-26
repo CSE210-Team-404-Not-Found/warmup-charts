@@ -120,8 +120,8 @@ Repository changes (one pull request, titled `ci(release): ...`):
    `{".": "0.1.0"}`.
 7. `.github/workflows/pr-title.yml`: `amannn/action-semantic-pull-request`
    on `pull_request_target` for opened, edited, reopened and synchronize,
-   with the types above, `pull-requests: read` permission and nothing
-   checked out.
+   with the types above, a subject pattern that rejects a trailing period,
+   `pull-requests: read` permission and nothing checked out.
 8. `.circleci/config.yml`: a `release` job on `main` after `check` that runs
    `.circleci/scripts/release.sh`, which calls
    `npx release-please@17 github-release` and then `release-pr`, both with

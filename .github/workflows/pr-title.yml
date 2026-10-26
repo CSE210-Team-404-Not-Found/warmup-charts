@@ -35,3 +35,7 @@ jobs:
             ci
             chore
             revert
+          subjectPattern: '^.*[^.]$'
+          subjectPatternError: >-
+            The subject "{subject}" ends with a period. Drop it: the title
+            becomes the commit subject on main and a line in the changelog.
