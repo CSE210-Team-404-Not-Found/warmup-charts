@@ -143,7 +143,8 @@ export class RenderScheduler {
      *         left: number, right: number, top: number, bottom: number,
      *         xRange: number[], yRange: number[]
      *     }}} options Canvas dimensions, scale, point radius, and plot transform.
-     * @param {function(ImageBitmap, Object): void} onBitmap Called for each bitmap while the draw is current.
+     * @param {function(ImageBitmap, Object): void} onBitmap Called for each bitmap while the
+     *                                                       draw is current.
      * @param {function(): boolean} isCurrent Returns whether this render is still current.
      * @returns {Promise<void>} Resolves when rendering completes or becomes stale.
      * @throws {Error} If the worker pool is destroyed or a render or callback fails.
@@ -218,8 +219,8 @@ export class RenderScheduler {
      * Resolves or rejects the pending render request for a worker response.
      * Closes the bitmap if the response no longer matches a pending request.
      *
-     * @param {{requestId: number, bitmap: (ImageBitmap|undefined), error: (string|undefined)}} message
-     * Response sent by a rendering worker.
+     * @param {{requestId: number, bitmap: (ImageBitmap|undefined),
+     * error: (string|undefined)}} message Response sent by a rendering worker.
      * @returns {void}
      */
     #onMessage(message) {
