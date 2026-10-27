@@ -42,10 +42,15 @@ coverage. So an `analyze` job runs beside `check` on every pipeline:
 * The orb's scanner reads `sonar-project.properties` and uploads the analysis.
 
 `sonar-project.properties` names the SonarQube Cloud organization and project,
-analyzes the shipped code and the tests, and reads the coverage report. Code
-that only runs in a browser (`demo/`, `benchmark/`, `src/worker.js`) is left
-out of the coverage measure, since Node's tests cannot load it. `prototypes/`
-stays outside the analysis, as it is outside ESLint, until it is resolved.
+analyzes the shipped code and the tests, and reads the coverage reports. Code
+that only runs in a browser was first left out of the coverage measure, since
+Node's tests cannot load it. Since the Playwright tests arrived, the `e2e`
+job records the lines the browser ran and passes them to `analyze` through a
+workspace as a second lcov file, so `src/chart.js` and `demo/` count too.
+Only `benchmark/` and `src/worker.js` stay excluded: nothing drives the
+benchmark page, and page-level coverage cannot see inside a worker.
+`prototypes/` stays outside the analysis, as it is outside ESLint, until it
+is resolved.
 
 CircleCI sets `CIRCLE_PULL_REQUEST` when the pushed commit is in an open pull
 request, and the scanner reads it to analyze the pull request against its base

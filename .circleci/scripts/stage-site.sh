@@ -9,5 +9,7 @@ site="$1"
 mkdir -p "$site"
 cp index.html style.css "$site"/
 cp -R src demo data images "$site"/
+# Generated internal docs, built by the build-docs job.
+cp -R docs/generated "$site"/docs
 # Pages serves the files as they are, without a Jekyll build.
 touch "$site"/.nojekyll

@@ -11,7 +11,7 @@ const MAX_WORKERS = 32; // maximum number of workers to use, even if the system 
  *
  * @param {number} length Number of points to partition; must be a non-negative safe integer.
  * @param {number} maxChunkSize Maximum number of points in each chunk
- * @returns {{start: number, end: number}[]} Chunk ranges in ascending index order.
+ * @returns {Array.<{start: number, end: number}>} Chunk ranges in ascending index order.
  * @throws {RangeError} If either argument is outside its valid range.
  */
 export function createChunkIndices(length, maxChunkSize) {
@@ -86,7 +86,7 @@ export class RenderScheduler {
      * Distributes each series' point data to the workers in transferable chunks.
      * If the same series array is already loaded, leaves the worker data intact.
      *
-     * @param {import("./series.js").Series[]} series Series whose points will be rendered.
+     * @param {Object[]} series Series whose points will be rendered.
      * @throws {Error} If the worker pool has been destroyed.
      */
     setSeries(series) {
@@ -141,13 +141,11 @@ export class RenderScheduler {
      * @param {{width: number, height: number, pixelWidth: number, pixelHeight: number,
      *     ratio: number, pointRadius: number, transform: {
      *         left: number, right: number, top: number, bottom: number,
-     *         xRange: [number, number], yRange: [number, number]
+     *         xRange: number[], yRange: number[]
      *     }}} options Canvas dimensions, scale, point radius, and plot transform.
-     * @param {(bitmap: ImageBitmap, task: {
-     *     key: string, workerIndex: number, seriesIndex: number, chunkIndex: number,
-     *     lastChunk: boolean
-     * }) => void} onBitmap Called for each bitmap while the draw is current.
-     * @param {() => boolean} isCurrent Returns whether this render is still current.
+     * @param {function(ImageBitmap, Object): void} onBitmap Called for each bitmap while the
+     *                                                       draw is current.
+     * @param {function(): boolean} isCurrent Returns whether this render is still current.
      * @returns {Promise<void>} Resolves when rendering completes or becomes stale.
      * @throws {Error} If the worker pool is destroyed or a render or callback fails.
      */
@@ -221,8 +219,8 @@ export class RenderScheduler {
      * Resolves or rejects the pending render request for a worker response.
      * Closes the bitmap if the response no longer matches a pending request.
      *
-     * @param {{requestId: number, bitmap?: ImageBitmap, error?: string}} message
-     * Response sent by a rendering worker.
+     * @param {{requestId: number, bitmap: (ImageBitmap|undefined),
+     * error: (string|undefined)}} message Response sent by a rendering worker.
      * @returns {void}
      */
     #onMessage(message) {
@@ -246,7 +244,7 @@ export class RenderScheduler {
      * @param {{width: number, height: number, pixelWidth: number, pixelHeight: number,
      *     ratio: number, pointRadius: number, transform: {
      *         left: number, right: number, top: number, bottom: number,
-     *         xRange: [number, number], yRange: [number, number]
+     *         xRange: number[], yRange: number[]
      *     }}} options Canvas dimensions, scale, point radius, and plot transform.
      * @returns {Promise<ImageBitmap>} Resolves with the rendered chunk bitmap.
      * @throws {Error} If posting the render request to the worker fails.

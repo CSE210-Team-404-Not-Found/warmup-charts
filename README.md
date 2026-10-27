@@ -13,7 +13,7 @@ dependencies or build step.
 - CSV loading that skips malformed rows and cells
 - Typed-array point storage, designed for data sets with millions of points
 
-A live demo is available at https://cse210-team-7-11.github.io/warmup-charts/.
+A live demo is available at https://cse210-team-404-not-found.github.io/warmup-charts/
 
 ## Running the demo
 The page uses ES modules, which browsers won't load from `file://`. Instead, serve the file with `python3`:
@@ -159,10 +159,12 @@ npm run lint
 npm test
 ```
 
-CircleCI runs them on every push and pull request, and publishes `main` to
-GitHub Pages when they pass. SonarQube Cloud analyzes `main` and each pull
+CircleCI runs them on every push and pull request, and publishes each release
+to GitHub Pages (ADR-0015). SonarQube Cloud analyzes `main` and each pull
 request from the same pipeline, test coverage included, and reports on the
 pull request (ADR-0014).
+ESLint's rules include the code-smell limits chosen in
+[docs/code-analysis.md](docs/code-analysis.md).
 
 ### Pre-commit hook
 `npm install` (or `npm ci`) also installs a Git pre-commit hook, using
@@ -184,3 +186,69 @@ git config core.hooksPath
 
 It should print `.husky/_`. In an emergency, `git commit --no-verify` skips
 the hook, but CI still runs the linter on every push.
+
+## E2E tests
+The end-to-end (E2E) tests open the demo in a real browser and use it the way a
+person would: loading files, changing options, hovering over points and downloading the chart. We use [Playwright](https://playwright.dev) to drive the
+browser. Each test checks one acceptance criterion from the user stories in
+`docs/user-stories.md`.
+
+**Files.** The following files are in `e2e/`:
+
+- `load-csv.spec.js`, `read-data.spec.js`, `tooltip.spec.js`, `customize.spec.js`,
+  and `large-data.spec.js` contain the tests, one file for each of the five user
+  stories.
+- `helpers.js` contains the steps the tests share such as opening the demo,
+  uploading a file and finding a series' color on the chart.
+- `server.js` is a small file server that Playwright starts before the tests so
+  you don't need to start one yourself.
+- `fixtures/` contains small CSV files whose points land in known places.
+
+**Getting Started.** You will need Node.js 22 or later. Install the dependencies
+and Chromium and then run the tests:
+
+```sh
+npm ci
+npx playwright install chromium
+npm run e2e
+```
+
+All the tests should pass in under a minute.
+
+**Running and Debugging Tips.**
+
+- To run a single file you give its path. e.g. `npx playwright test e2e/tooltip.spec.js`.
+- Add `--headed` to watch the browser while the tests run or `--ui` to open
+  Playwright's test viewer where you can step through each test.
+- When a test fails, Playwright saves a trace in `test-results/`. You can open it
+  with `npx playwright show-trace <path to trace.zip>`.
+
+**Continuous Integration.** CircleCI runs the E2E tests on every push in
+Playwright's Docker image. The version of that image must match the version of
+`@playwright/test` in `package.json` so update both together.
+
+**Coverage.** Each test records which lines of the page's scripts the browser
+ran, and the run ends by merging them into `test-results/e2e-lcov.info`.
+CircleCI hands that file to the `analyze` job, so Sonar counts the browser
+tests towards coverage next to the Node tests. It counts lines executed, not
+behaviour checked: a line the browser ran while a test looked at something
+else still counts.
+
+**Limitations.** The chart is drawn on a canvas. The page cannot tell the
+tests where the points are. Instead, the tests find points by looking for each
+series' color in the canvas pixels. Anything that is only visible in the
+picture such as how the axes fit the data or the order in which a line connects
+its points is not tested.
+
+## Releases
+Pull request titles follow Conventional Commits, such as
+`feat(chart): add a log scale`, and a GitHub check holds the squash merge until
+the title does. release-please turns the merged titles into a release pull
+request carrying the version bump and the changelog. Merging that pull request
+tags the release, publishes its notes on GitHub and deploys the site. The
+version is `VERSION` in `src/index.js` and shows in the page header. See
+[docs/releases.md](docs/releases.md) and ADR-0015.
+
+## Contributing
+See [CONTRIBUTING.md](CONTRIBUTING.md) for the team's GitHub, code, and
+repository README standards.

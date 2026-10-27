@@ -3,3 +3,5 @@ node_modules/
 _site/
 .idea/
 lcov.info
+test-results/
+playwright-report/

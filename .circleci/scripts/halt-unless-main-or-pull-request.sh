@@ -3,9 +3,9 @@
 # request. SonarQube Cloud has nowhere to report other branches, and its Free
 # plan does not analyze them.
 #
-# Reads CIRCLE_BRANCH and CIRCLE_PULL_REQUEST.
+# Reads CIRCLE_BRANCH, which tag pipelines leave unset, and CIRCLE_PULL_REQUEST.
 set -euo pipefail
 
-if [[ "$CIRCLE_BRANCH" != "main" && -z "${CIRCLE_PULL_REQUEST:-}" ]]; then
+if [[ "${CIRCLE_BRANCH:-}" != "main" && -z "${CIRCLE_PULL_REQUEST:-}" ]]; then
     circleci-agent step halt
 fi
