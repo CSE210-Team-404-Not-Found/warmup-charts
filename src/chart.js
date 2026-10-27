@@ -58,10 +58,10 @@ export class Chart {
      * @param {boolean} [options.showAxes]  Axis lines and ticks (default true).
      * @param {boolean} [options.showAxisLabels]  Axis labels (default true).
      * @param {boolean} [options.showLegend]  Legend (default true).
-     * @param {[number, number]} [options.xRange]  Fixed x axis start and end
-     *     (default: fit the data).
-     * @param {[number, number]} [options.yRange]  Fixed y axis start and end
-     *     (default: fit the data).
+     * @param {number[]} [options.xRange]  Fixed x axis start and end
+     *     (default: fit the data); two numbers in ascending order.
+     * @param {number[]} [options.yRange]  Fixed y axis start and end
+     *     (default: fit the data); two numbers in ascending order.
      * @param {string} [options.xLabel]  x axis label.
      * @param {string} [options.yLabel]  y axis label.
      */

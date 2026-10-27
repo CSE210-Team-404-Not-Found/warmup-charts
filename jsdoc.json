@@ -1,0 +1,14 @@
+{
+  "source": {
+    "include": ["src"],
+    "includePattern": ".+\\.js$",
+    "excludePattern": "(node_modules|__tests__|\\.test\\.js)"
+  },
+  "opts": {
+    "destination": "docs/generated",
+    "recurse": true,
+    "readme": "README.md",
+    "private": true
+  },
+  "plugins": ["plugins/markdown"]
+}
