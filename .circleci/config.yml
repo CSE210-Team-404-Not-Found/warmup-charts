@@ -50,6 +50,19 @@ jobs:
       - run: npm run coverage
       - sonarcloud/scan
 
+  build-docs:
+    executor: node
+    steps:
+      - checkout
+      - run: npm ci
+      - run: npm run docs
+      # - store_artifacts:
+      #     path: docs/generated
+      #     destination: docs
+      - persist_to_workspace:
+          root: .
+          paths:
+            - docs/generated
   release:
     executor: node
     environment:
@@ -64,6 +77,8 @@ jobs:
       REPOSITORY: << pipeline.git.repo_owner >>/<< pipeline.git.repo_name >>
     steps:
       - checkout
+      - attach_workspace:
+          at: .
       - add_ssh_keys
       - run: .circleci/scripts/stage-site.sh _site
       - run: .circleci/scripts/publish-branch.sh _site gh-pages
@@ -72,12 +87,13 @@ workflows:
   check-and-deploy:
     # A job runs on a release tag only if it, and every job it requires, has a
     # tags filter. Branches are unaffected by a tags filter.
-    jobs:
+    jobs:              
       - check:
           filters:
             tags:
               only: /^v.*/
       - e2e
+      - build-docs
       - analyze:
           context: SonarCloud
           requires: [e2e]
@@ -88,7 +104,7 @@ workflows:
             branches:
               only: main
       - deploy:
-          requires: [check]
+          requires: [check, build-docs]
           filters:
             branches:
               ignore: /.*/
