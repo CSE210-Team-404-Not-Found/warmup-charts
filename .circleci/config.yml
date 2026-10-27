@@ -1,5 +1,6 @@
-# Checks on every push, SonarQube Cloud analysis of main and pull requests, and
-# the GitHub Pages deploy of main. See ADR-0013 and ADR-0014.
+# Checks on every push, SonarQube Cloud analysis of main and pull requests,
+# release pull requests on main, and the GitHub Pages deploy of each release
+# tag. See ADR-0013, ADR-0014 and ADR-0015.
 
 version: 2.1
 
@@ -20,11 +21,31 @@ jobs:
       - run: npm run lint
       - run: npm test
 
+  e2e:
+    # Playwright's image has its browsers installed. Its version must match
+    # @playwright/test in package.json.
+    docker:
+      - image: mcr.microsoft.com/playwright:v1.64.1-noble
+    steps:
+      - checkout
+      - run: npm ci
+      - run: npm run e2e
+      # The browser tests' coverage, for the analyze job.
+      - persist_to_workspace:
+          root: .
+          paths: [test-results/e2e-lcov.info]
+      - store_test_results:
+          path: test-results
+      - store_artifacts:
+          path: test-results
+
   analyze:
     executor: node
     steps:
       - checkout
       - run: .circleci/scripts/halt-unless-main-or-pull-request.sh
+      - attach_workspace:
+          at: .
       - run: npm ci
       - run: npm run coverage
       - sonarcloud/scan
@@ -42,6 +63,13 @@ jobs:
           root: .
           paths:
             - docs/generated
+  release:
+    executor: node
+    environment:
+      REPOSITORY: << pipeline.git.repo_owner >>/<< pipeline.git.repo_name >>
+    steps:
+      - checkout
+      - run: .circleci/scripts/release.sh
 
   deploy:
     executor: node
@@ -57,13 +85,28 @@ jobs:
 
 workflows:
   check-and-deploy:
-    jobs:
-      - check
-      - build-docs
+    # A job runs on a release tag only if it, and every job it requires, has a
+    # tags filter. Branches are unaffected by a tags filter.
+    jobs:              
+      - check:
+          filters:
+            tags:
+              only: /^v.*/
+      - e2e
+      - buid-docs
       - analyze:
           context: SonarCloud
+          requires: [e2e]
+      - release:
+          context: GitHub
+          requires: [check]
+          filters:
+            branches:
+              only: main
       - deploy:
           requires: [check, build-docs]
           filters:
             branches:
-              only: main
+              ignore: /.*/
+            tags:
+              only: /^v.*/
