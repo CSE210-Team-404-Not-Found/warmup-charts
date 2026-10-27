@@ -166,6 +166,27 @@ pull request (ADR-0014).
 ESLint's rules include the code-smell limits chosen in
 [docs/code-analysis.md](docs/code-analysis.md).
 
+### Pre-commit hook
+`npm install` (or `npm ci`) also installs a Git pre-commit hook, using
+[husky](https://typicode.github.io/husky/) and
+[lint-staged](https://github.com/lint-staged/lint-staged). There is nothing
+else to set up. If you cloned the repository before the hook was added, run
+`npm install` once more.
+
+On each commit, the hook runs `eslint --fix` on the staged `.js` files. Fixable
+problems, such as indentation and quotes, are corrected and added to the
+commit. Any remaining error blocks the commit; fix it, stage the file, and
+commit again.
+
+To check that the hook is installed, run:
+
+```sh
+git config core.hooksPath
+```
+
+It should print `.husky/_`. In an emergency, `git commit --no-verify` skips
+the hook, but CI still runs the linter on every push.
+
 ## E2E tests
 The end-to-end (E2E) tests open the demo in a real browser and use it the way a
 person would: loading files, changing options, hovering over points and downloading the chart. We use [Playwright](https://playwright.dev) to drive the
