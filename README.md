@@ -13,7 +13,7 @@ dependencies or build step.
 - CSV loading that skips malformed rows and cells
 - Typed-array point storage, designed for data sets with millions of points
 
-A live demo is available at https://cse210-team-7-11.github.io/warmup-charts/.
+A live demo is available at https://cse210-team-404-not-found.github.io/warmup-charts/
 
 ## Running the demo
 The page uses ES modules, which browsers won't load from `file://`. Instead, serve the file with `python3`:
