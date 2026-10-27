@@ -1,0 +1,170 @@
+/*
+    Page styles (for frontend team)
+
+    Feel free to link in other new CSS files for structuring purposes!
+*/
+
+:root {
+    --page-bg: #ffffff;
+    --surface-bg: #bccde5;
+    --text-color: #222222;
+    --title-color: #222222;
+    --subtitle-color: #566274;
+    --border-color: #aaaaaa;
+    --header-border: 1px solid #aaaaaa;
+    --chart-border: 1px solid #aaaaaa;
+    --error-color: #990000;
+    font-family: "Nunito", sans-serif;
+}
+
+/* Toggled by demo/theme.js. */
+:root[data-theme="seven-eleven"] {
+    --primary-bg-color: #008061;
+    --secondary-bg-color: #ffffff;
+    --tertiary-bg-color: #dbede8;
+    --primary-accent-color: #ed1b2d;
+    --secondary-accent-color: #f5821f;
+
+    --page-bg: var(--tertiary-bg-color);
+    --surface-bg: var(--secondary-bg-color);
+    --title-color: var(--primary-accent-color);
+    --subtitle-color: var(--secondary-accent-color);
+    --header-border: 3vmin solid var(--primary-bg-color);
+    --chart-border: 3px solid var(--primary-bg-color);
+    --error-color: var(--primary-accent-color);
+}
+
+body {
+    margin: 0;
+    color: var(--text-color);
+    background-color: var(--page-bg);
+}
+
+/* header */
+header {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    background-color: var(--surface-bg);
+    padding-top: 1vh;
+    margin-bottom: 0vh;
+}
+
+h3 {
+    margin: 0;
+    padding: 0;
+}
+
+.row {
+    display: flex;
+    align-items: center;
+    padding-left: 1vw;
+    gap: 0.5vw;
+}
+
+hgroup {
+    display: flex;
+    flex-direction: column;
+}
+
+hgroup h1 {
+    color: var(--title-color);
+    font-size: 1.5rem;
+}
+
+hgroup p {
+    padding-bottom: 0px;
+    margin-bottom: 0px;
+    bottom: 0px;
+    font-size: 0.5rem;
+    color: var(--subtitle-color);
+}
+
+button {
+    font: inherit;
+    border-radius: 10px;
+    border-color: var(--subtitle-color);
+    margin-right: 1vw;
+}
+
+section {
+    display: grid;
+    align-content: start;
+    row-gap: 1vmin;
+}
+
+main {
+    display: flex;
+    margin: 2vh 1.5vw 0vh 1.5vw;
+    gap: 3vw;
+}
+
+.controls {
+    background-color: var(--surface-bg);
+    border-radius: 10px;
+    padding: 0.5vmin;
+    border: 5px solid var(--border-color);
+}
+
+#right-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 1vh;
+}
+
+select, input, option {
+    font: inherit;
+    margin: 0;
+    padding-left: 0.5vmin;
+}
+
+#dataset-name {
+    margin: 0;
+}
+
+#apply-changes {
+    justify-self: start;
+}
+
+#chart-status {
+    min-height: 1lh;
+    color: #006b4f;
+    font-weight: 600;
+}
+
+#message {
+    margin: 0;
+    padding: 8px 12px;
+    border: 1px solid var(--error-color);
+    color: var(--error-color);
+    background-color: var(--surface-bg);
+}
+
+#tooltip {
+  position: fixed;
+  pointer-events: none;
+  background: rgba(0,0,0,0.8);
+  color: white;
+  padding: 6px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  z-index: 10;
+}
+
+#chart-scroll {
+    overflow-x: auto;
+}
+
+#chart {
+    display: block;
+    border: var(--chart-border);
+    box-sizing: border-box;
+    background-color: var(--surface-bg);
+}
+
+@media (max-width: 600px) {
+    main {
+        grid-template-columns: 1fr;
+    }
+}

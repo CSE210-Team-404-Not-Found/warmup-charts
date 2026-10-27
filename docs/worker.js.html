@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>JSDoc: Source: worker.js</title>
+
+    <script src="scripts/prettify/prettify.js"> </script>
+    <script src="scripts/prettify/lang-css.js"> </script>
+    <!--[if lt IE 9]>
+      <script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script>
+    <![endif]-->
+    <link type="text/css" rel="stylesheet" href="styles/prettify-tomorrow.css">
+    <link type="text/css" rel="stylesheet" href="styles/jsdoc-default.css">
+</head>
+
+<body>
+
+<div id="main">
+
+    <h1 class="page-title">Source: worker.js</h1>
+
+    
+
+
+
+    
+    <section>
+        <article>
+            <pre class="prettyprint source linenums"><code>/**
+ * Worker-owned point chunks and reusable OffscreenCanvas for scatter rendering.
+ */
+const data = new Map();
+let canvas;
+let ctx;
+
+/**
+ * Handles commands from the main thread to clear stored data, load point
+ * chunks, or render a chunk and return its bitmap.
+ */
+self.addEventListener("message", (event) => {
+    const message = event.data;
+    if (message.type === "clear-data") {
+        data.clear();
+        return;
+    }
+    if (message.type === "set-data") {
+        data.set(message.key, {
+            xs: new Float32Array(message.xs),
+            ys: new Float32Array(message.ys),
+        });
+        return;
+    }
+    if (message.type === "render") {
+        render(message);
+    }
+});
+
+/**
+ * Renders a stored chunk as a white mask and sends its bitmap to the scheduler.
+ *
+ * @param {{requestId: number, key: string, width: number, height: number,
+ *     pixelWidth: number, pixelHeight: number, ratio: number, pointRadius: number,
+ *     left: number, right: number, top: number, bottom: number,
+ *     x0: number, x1: number, y0: number, y1: number}} message Render request
+ *     containing the chunk key, canvas dimensions, scale, point radius, and plot bounds.
+ * @returns {void}
+ */
+function render(message) {
+    try {
+        // create a reusable OffscreenCanvas and context if it doesn't exist
+        if (!canvas) {
+            canvas = new OffscreenCanvas(message.pixelWidth, message.pixelHeight);
+            ctx = canvas.getContext("2d");
+            if (!ctx) {
+                throw new Error("Could not create a worker canvas context.");
+            }
+        }
+        if (canvas.width !== message.pixelWidth || canvas.height !== message.pixelHeight) {
+            canvas.width = message.pixelWidth;
+            canvas.height = message.pixelHeight;
+        }
+        // retrieve the chunk's point data from memory
+        const points = data.get(message.key);
+        if (!points) {
+            throw new Error(`Worker data is missing for chunk ${message.key}.`);
+        }
+        const { xs, ys } = points;
+        // draw chunk
+        ctx.setTransform(message.ratio, 0, 0, message.ratio, 0, 0);
+        ctx.clearRect(0, 0, message.width, message.height);
+        ctx.save();
+        ctx.beginPath();
+        const pad = message.pointRadius + 1;
+        ctx.rect(message.left - pad, message.top - pad,
+            message.right - message.left + 2 * pad, message.bottom - message.top + 2 * pad);
+        ctx.clip();
+        ctx.fillStyle = "#fff";
+        ctx.beginPath();
+        for (let i = 0; i &lt; xs.length; i++) {
+            const px = message.left + (xs[i] - message.x0) / (message.x1 - message.x0)
+                * (message.right - message.left);
+            const py = message.bottom - (ys[i] - message.y0) / (message.y1 - message.y0)
+                * (message.bottom - message.top);
+            ctx.moveTo(px + message.pointRadius, py);
+            ctx.arc(px, py, message.pointRadius, 0, Math.PI * 2);
+        }
+        ctx.fill();
+        ctx.restore();
+        // Send the rendered layer as bitmap back to scheduler
+        const bitmap = canvas.transferToImageBitmap();
+        self.postMessage({
+            requestId: message.requestId,
+            bitmap,
+        }, [bitmap]);
+    } catch (error) {
+        self.postMessage({
+            requestId: message.requestId,
+            error: error instanceof Error ? error.message : String(error),
+        });
+    }
+}
+</code></pre>
+        </article>
+    </section>
+
+
+
+
+</div>
+
+<nav>
+    <h2><a href="index.html">Home</a></h2><h3>Classes</h3><ul><li><a href="Chart_Chart.html">Chart</a></li><li><a href="PointSet_PointSet.html">PointSet</a></li><li><a href="RenderScheduler.html">RenderScheduler</a></li><li><a href="Series_Series.html">Series</a></li></ul><h3>Global</h3><ul><li><a href="global.html#INSERTION_SORT_MAX">INSERTION_SORT_MAX</a></li><li><a href="global.html#VERSION">VERSION</a></li><li><a href="global.html#checkSize">checkSize</a></li><li><a href="global.html#createChunkIndices">createChunkIndices</a></li><li><a href="global.html#data">data</a></li><li><a href="global.html#fitRange">fitRange</a></li><li><a href="global.html#formatTick">formatTick</a></li><li><a href="global.html#introsort">introsort</a></li><li><a href="global.html#parseCSV">parseCSV</a></li><li><a href="global.html#partition">partition</a></li><li><a href="global.html#randomData">randomData</a></li><li><a href="global.html#render">render</a></li><li><a href="global.html#tickCount">tickCount</a></li><li><a href="global.html#tickStep">tickStep</a></li><li><a href="global.html#ticks">ticks</a></li></ul>
+</nav>
+
+<br class="clear">
+
+<footer>
+    Documentation generated by <a href="https://github.com/jsdoc/jsdoc">JSDoc 4.0.5</a> on Tue Oct 27 2026 17:59:40 GMT+0000 (Coordinated Universal Time)
+</footer>
+
+<script> prettyPrint(); </script>
+<script src="scripts/linenumber.js"> </script>
+</body>
+</html>
