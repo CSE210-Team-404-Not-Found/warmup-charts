@@ -8,7 +8,7 @@
  */
 
 /** The released version. The release tooling rewrites this line (ADR-0015). */
-export const VERSION = "0.2.0"; // x-release-please-version
+export const VERSION = "0.2.1"; // x-release-please-version
 
 export { Chart } from "./chart.js";
 export { Series } from "./series.js";
