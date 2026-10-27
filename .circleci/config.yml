@@ -93,7 +93,10 @@ workflows:
             tags:
               only: /^v.*/
       - e2e
-      - build-docs
+      - build-docs:
+          filters:
+            tags:
+              only: /^v.*/
       - analyze:
           context: SonarCloud
           requires: [e2e]
